@@ -1,6 +1,7 @@
 import "server-only";
 import postgres from "postgres";
 import { AppError } from "./errors";
+import { databaseTls } from "./database-tls.mjs";
 
 export interface Database {
   query<T extends object = Record<string, unknown>>(
@@ -28,11 +29,7 @@ export function database(): Database {
       503,
     );
   connection ??= postgres(databaseUrl, {
-    ssl: ["localhost", "127.0.0.1", "[::1]"].includes(
-      new URL(databaseUrl).hostname,
-    )
-      ? false
-      : "verify-full",
+    ssl: databaseTls(databaseUrl),
     max: 3,
     prepare: false,
     idle_timeout: 20,

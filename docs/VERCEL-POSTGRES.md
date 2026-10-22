@@ -14,6 +14,8 @@ En el editor SQL del proveedor, ejecuta `db/migrations/001_accounts.sql`. Crea �
 
 Alternativa desde tu ordenador: instala las dependencias, guarda `DATABASE_URL` en `.env.local` y ejecuta `npm run db:migrate`. Ese comando carga el archivo privado y no imprime la conexión. La compilación no ejecuta migraciones ni necesita conectarse a la base.
 
+Las conexiones remotas verifican el certificado y el nombre del servidor. Para los dominios oficiales de PostgreSQL y del pool de Supabase se incluye su certificado raíz público, tomado de la misma dirección que utiliza su panel. Para otro proveedor con una CA privada, configura `DATABASE_CA_CERT` con el PEM completo. No desactives la validación TLS para resolver errores de certificados. Solo las conexiones locales de desarrollo usan HTTP/TCP sin TLS. Si Preview comparte la base de Production, ambos deben usar el mismo secreto de cifrado; con bases separadas, usa secretos distintos. No pruebes a modificar datos de usuarios reales desde Preview.
+
 ## 2. Configurar las variables privadas
 
 Genera un secreto una sola vez en tu terminal:

@@ -9,6 +9,8 @@ import { defaultSettings } from "../lib/defaults";
 import { mockFixtures } from "../lib/mock";
 import { toggleMatch } from "../lib/selection";
 import type { ReferenceImage } from "../lib/types";
+import { databaseTls } from "../lib/database-tls.mjs";
+import { X509Certificate } from "node:crypto";
 
 function reference(name: string, content: string): ReferenceImage {
   return {
@@ -19,6 +21,29 @@ function reference(name: string, content: string): ReferenceImage {
     notes: name,
   };
 }
+
+test("database TLS keeps certificate and hostname verification and trusts Supabase's official root", () => {
+  assert.equal(databaseTls("postgres://user:pass@localhost/db"), false);
+  assert.equal(
+    databaseTls("postgres://user:pass@example.org/db"),
+    "verify-full",
+  );
+  const options = databaseTls(
+    "postgres://user:pass@aws-0-eu-west-1.pooler.supabase.com/db",
+  );
+  assert.ok(typeof options === "object");
+  assert.equal(options.rejectUnauthorized, true);
+  assert.equal(
+    new X509Certificate(options.ca).fingerprint256
+      .replaceAll(":", "")
+      .toLowerCase(),
+    "807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa",
+  );
+  assert.equal(
+    databaseTls("postgres://user:pass@fake.supabase.com.attacker.test/db"),
+    "verify-full",
+  );
+});
 
 test("match overrides inherit current defaults and allow an explicitly empty title", () => {
   const defaults = { ...defaultSettings, headline: "Título general" };

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
+import { databaseTls } from "../lib/database-tls.mjs";
 
 // Environment is injected by the platform/terminal. Never print connection strings.
 const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -10,11 +11,7 @@ if (!databaseUrl) {
   process.exit(1);
 }
 const sql = postgres(databaseUrl, {
-  ssl: ["localhost", "127.0.0.1", "[::1]"].includes(
-    new URL(databaseUrl).hostname,
-  )
-    ? false
-    : "verify-full",
+  ssl: databaseTls(databaseUrl),
   max: 1,
   prepare: false,
   connect_timeout: 10,
