@@ -36,8 +36,25 @@ test("PostgreSQL migration, registration, durable sessions, owner-isolated encry
       new URL("../db/migrations/001_accounts.sql", import.meta.url),
       "utf8",
     );
+    await pg.exec(
+      "CREATE ROLE anon; CREATE ROLE authenticated; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;",
+    );
     await pg.exec(migration);
     await pg.exec(migration); // repeat application is safe
+    const access = await pg.query<{
+      protected: boolean;
+      anonymous_read: boolean;
+      authenticated_read: boolean;
+    }>(
+      "SELECT relrowsecurity AS protected, has_table_privilege('anon',oid,'SELECT') AS anonymous_read, has_table_privilege('authenticated',oid,'SELECT') AS authenticated_read FROM pg_class WHERE relnamespace='public'::regnamespace AND relname LIKE 'matchday_%' AND relkind='r'",
+    );
+    assert.equal(access.rows.length, 7);
+    assert.ok(
+      access.rows.every(
+        (row) =>
+          row.protected && !row.anonymous_read && !row.authenticated_read,
+      ),
+    );
     const accounts = createAccounts(db);
     const a = await accounts.register(
       { email: " A@EXAMPLE.COM ", password: "a-long-password" },

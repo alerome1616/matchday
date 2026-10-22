@@ -12,6 +12,10 @@ Puedes seleccionar más de cuatro partidos de varias fechas. Cambiar de día o f
 
 ## Empezar
 
+En **Tu lista**, pulsa **Editar** junto a cada partido para asignarle un prompt maestro, un título y referencias exclusivas. Puedes sumar las referencias generales o desactivarlas para ese encuentro. Los ajustes se mantienen al navegar entre jornadas y se vacían al quitar el partido, recargar o cambiar de cuenta. La vista previa y la galería conservan el prompt y título realmente utilizados. Cada solicitud admite cuatro referencias y 4 MB en total, contando las generales.
+
+Las integraciones de Vercel que proporcionan `POSTGRES_URL` se detectan automáticamente como PostgreSQL. `DATABASE_URL` tiene prioridad. La migración también protege las tablas frente a los roles públicos de Supabase; las cuentas siguen gestionadas por la aplicación.
+
 Node.js 22.13+ y npm.
 
 ```sh

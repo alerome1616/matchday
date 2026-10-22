@@ -1,6 +1,7 @@
 import "server-only";
 import postgres from "postgres";
 import { AppError } from "./errors";
+import { databaseTls } from "./database-tls.mjs";
 
 export interface Database {
   query<T extends object = Record<string, unknown>>(
@@ -21,17 +22,14 @@ function adapter(sql: ReturnType<typeof postgres>): Database {
   };
 }
 export function database(): Database {
-  if (!process.env.DATABASE_URL)
+  const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!databaseUrl)
     throw new AppError(
       "La base de datos de las cuentas está pendiente de conectar.",
       503,
     );
-  connection ??= postgres(process.env.DATABASE_URL, {
-    ssl: ["localhost", "127.0.0.1", "[::1]"].includes(
-      new URL(process.env.DATABASE_URL).hostname,
-    )
-      ? false
-      : "verify-full",
+  connection ??= postgres(databaseUrl, {
+    ssl: databaseTls(databaseUrl),
     max: 3,
     prepare: false,
     idle_timeout: 20,

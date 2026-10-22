@@ -46,8 +46,10 @@ export function SettingsPanel({
         <span className="step">02</span>
       </div>
       <p className="panel-intro">
-        Imágenes originales con escenas, camisetas y referencias.
+        Ajustes generales. En tu lista, pulsa Editar para personalizar cada
+        partido.
       </p>
+      <SelectionList app={app} />
       <label className="field-label" htmlFor={prefix + "scene"}>
         Escena
       </label>
@@ -168,7 +170,6 @@ export function SettingsPanel({
         </button>
       </div>
       <ReferenceUploader app={app} />
-      <SelectionList app={app} />
       <div className="quality-row">
         <label htmlFor={prefix + "quality"}>Calidad</label>
         <select
@@ -325,23 +326,27 @@ export function SettingsPanel({
         className="prompt-preview-modal"
       >
         <p className="muted">
-          Se generará una imagen por partido, con las {app.references.length}{" "}
-          referencias adjuntas.
+          Cada imagen usará el prompt, el título y las referencias de su
+          partido.
         </p>
-        {app.selectedMatches.map(({ fixture: f, key, date }) => (
-          <div className="prompt-final" key={key}>
-            <h3>
-              {f.home.name} × {f.away.name} · {date}
-            </h3>
-            <pre>
-              {buildPrompt(
-                f,
-                settings,
-                app.references.map(({ role, notes }) => ({ role, notes })),
-              )}
-            </pre>
-          </div>
-        ))}
+        {app.selectedMatches.map(({ fixture: f, key, date }) => {
+          const design = app.getMatchDesign(key);
+          return (
+            <div className="prompt-final" key={key}>
+              <h3>
+                {f.home.name} × {f.away.name} · {date}
+              </h3>
+              <p>{design.references.length} referencias</p>
+              <pre>
+                {buildPrompt(
+                  f,
+                  design.settings,
+                  design.references.map(({ role, notes }) => ({ role, notes })),
+                )}
+              </pre>
+            </div>
+          );
+        })}
       </Modal>
     </section>
   );

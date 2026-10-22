@@ -25,6 +25,8 @@ import {
   deleteLocalImage,
 } from "@/lib/local-gallery";
 import { settingsSchema } from "@/lib/validation";
+import { useMatchDesigns } from "./use-match-designs";
+import { matchGenerationForm, referenceFilesError } from "@/lib/match-designs";
 import {
   toggleMatch,
   selectVisible,
@@ -96,6 +98,8 @@ export function useStudio(config: RuntimeConfig) {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const matchDesigns = useMatchDesigns(settings, references, setError);
+  const { clearMatchDrafts } = matchDesigns;
   const [saved, setSaved] = useState(true);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -104,20 +108,24 @@ export function useStudio(config: RuntimeConfig) {
   userIdRef.current = user?.id ?? null;
   const busy = useRef(false);
   const settingsDirty = useRef(false);
-  const updateAccount = useCallback((account: StudioUser | null) => {
-    if (userIdRef.current !== (account?.id ?? null)) {
-      setApiKey("");
-      setKeyStatus(null);
-      setImages([]);
-      setSelectedMatches([]);
-      setSettings(defaultSettings);
-      referencesRef.current.forEach((r) => URL.revokeObjectURL(r.preview));
-      setReferences([]);
-    }
-    userIdRef.current = account?.id ?? null;
-    setUser(account);
-    setAuthReady(true);
-  }, []);
+  const updateAccount = useCallback(
+    (account: StudioUser | null) => {
+      if (userIdRef.current !== (account?.id ?? null)) {
+        setApiKey("");
+        setKeyStatus(null);
+        setImages([]);
+        setSelectedMatches([]);
+        clearMatchDrafts();
+        setSettings(defaultSettings);
+        referencesRef.current.forEach((r) => URL.revokeObjectURL(r.preview));
+        setReferences([]);
+      }
+      userIdRef.current = account?.id ?? null;
+      setUser(account);
+      setAuthReady(true);
+    },
+    [clearMatchDrafts],
+  );
   useEffect(() => {
     if (config.demo) {
       try {
@@ -222,12 +230,19 @@ export function useStudio(config: RuntimeConfig) {
         setImages([]);
         setSettings(defaultSettings);
         setSelectedMatches([]);
+        clearMatchDrafts();
       }
       setUser(session?.user ?? null);
       setAuthReady(true);
     });
     return () => subscription.unsubscribe();
-  }, [config.demo, config.configured, config.authProvider, updateAccount]);
+  }, [
+    config.demo,
+    config.configured,
+    config.authProvider,
+    updateAccount,
+    clearMatchDrafts,
+  ]);
   useEffect(() => {
     setKeyStatus(null);
     if (!user || config.demo) return;
@@ -416,8 +431,11 @@ export function useStudio(config: RuntimeConfig) {
   }
   function toggle(id: number) {
     const fixture = fixtures.find((f) => f.id === id);
-    if (fixture)
+    if (fixture) {
+      if (selected.includes(selectionKey(date, id)))
+        clearMatchDrafts([selectionKey(date, id)]);
       setSelectedMatches((current) => toggleMatch(current, fixture, date));
+    }
   }
   function addReferences(files: File[]) {
     if (references.length + files.length > MAX_REFERENCE_FILES) {
@@ -480,21 +498,30 @@ export function useStudio(config: RuntimeConfig) {
       setAuthOpen(true);
       return;
     }
-    if (!settingsSchema.safeParse(settings).success) {
-      setError("Revisa el prompt: debe tener entre 20 y 4.000 caracteres.");
-      return;
+    const batch = selectedMatches.map((match) => {
+      const design = matchDesigns.getMatchDesign(match.key);
+      return {
+        ...structuredClone(match),
+        settings: { ...design.settings },
+        references: design.references.map((r) => ({ ...r })),
+      };
+    });
+    for (const match of batch) {
+      const invalid = !settingsSchema.safeParse(match.settings).success
+        ? "Revisa el prompt (20–4.000 caracteres) y el título (máximo 160)."
+        : referenceFilesError(match.references.map((r) => r.file));
+      if (invalid) {
+        setError(
+          `${match.fixture.home.name} × ${match.fixture.away.name} · ${match.date}: ${invalid}`,
+        );
+        matchDesigns.setEditingMatchKey(match.key);
+        return;
+      }
     }
     busy.current = true;
     setGenerating(true);
     setError("");
-    const batch = structuredClone(selectedMatches);
     stopRequested.current = false;
-    const snapshot = structuredClone(settings);
-    const referenceSnapshot = [...references];
-    const instructions = referenceSnapshot.map(({ role, notes }) => ({
-      role,
-      notes,
-    }));
     let temporaryKey = apiKey.trim();
     const owner = userIdRef.current;
     setProgress({ done: 0, total: batch.length });
@@ -505,20 +532,19 @@ export function useStudio(config: RuntimeConfig) {
         if (owner !== userIdRef.current) return;
         if (stopRequested.current) break;
         const { fixture: f, date: fixtureDate, key: selectedKey } = batch[i];
+        const snapshot = batch[i].settings;
+        const instructions = batch[i].references.map(({ role, notes }) => ({
+          role,
+          notes,
+        }));
         try {
-          const payload = {
-            fixtureIds: [f.id],
-            date: fixtureDate,
-            settings: snapshot,
-            requestId: crypto.randomUUID(),
-            references: instructions,
-          };
-          const form = new FormData();
-          form.set("payload", JSON.stringify(payload));
-          referenceSnapshot.forEach((r) =>
-            form.append("references", r.file, r.file.name),
+          const requestId = crypto.randomUUID();
+          const form = matchGenerationForm(
+            batch[i],
+            batch[i],
+            requestId,
+            temporaryKey,
           );
-          if (temporaryKey) form.set("apiKey", temporaryKey);
           if (temporaryKey && config.demo) {
             const response = await fetch("/api/generate-session", {
               method: "POST",
@@ -535,7 +561,7 @@ export function useStudio(config: RuntimeConfig) {
             const url = URL.createObjectURL(blob);
             imageUrlsRef.current.push(url);
             const image: GalleryImage = {
-              id: payload.requestId,
+              id: requestId,
               fixture: f,
               settings: snapshot,
               prompt: buildPrompt(f, snapshot, instructions),
@@ -574,6 +600,7 @@ export function useStudio(config: RuntimeConfig) {
           }
 
           success++;
+          clearMatchDrafts([selectedKey]);
           setSelectedMatches((matches) =>
             matches.filter((match) => match.key !== selectedKey),
           );
@@ -666,6 +693,7 @@ export function useStudio(config: RuntimeConfig) {
     }
   }
   return {
+    ...matchDesigns,
     config,
     apiKey,
     setApiKey,
@@ -692,13 +720,26 @@ export function useStudio(config: RuntimeConfig) {
     selected,
     selectedMatches,
     isSelected: (id: number) => selected.includes(selectionKey(date, id)),
-    toggleVisible: (visible: Fixture[]) =>
-      setSelectedMatches((current) => selectVisible(current, visible, date)),
-    removeSelected: (key: string) =>
+    toggleVisible: (visible: Fixture[]) => {
+      const next = selectVisible(selectedMatches, visible, date);
+      const retained = new Set(next.map((match) => match.key));
+      clearMatchDrafts(
+        selectedMatches
+          .filter((match) => !retained.has(match.key))
+          .map((match) => match.key),
+      );
+      setSelectedMatches(next);
+    },
+    removeSelected: (key: string) => {
+      clearMatchDrafts([key]);
       setSelectedMatches((current) =>
         current.filter((match) => match.key !== key),
-      ),
-    clearSelection: () => setSelectedMatches([]),
+      );
+    },
+    clearSelection: () => {
+      clearMatchDrafts();
+      setSelectedMatches([]);
+    },
     stopGeneration: () => {
       stopRequested.current = true;
       setMessage("Se detendrá al terminar la imagen en curso.");
