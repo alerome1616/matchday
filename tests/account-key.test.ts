@@ -8,11 +8,39 @@ import {
   readUserApiKey,
   getApiKeyStatus,
   deleteUserApiKey,
+  keyStorageConfigured,
 } from "../lib/user-api-key";
 import type { ApiKeyStatus } from "../lib/types";
 
 const exampleKey = "sk-test-example-credential-never-a-real-key-1234";
 const master = "12".repeat(32);
+
+test("Vercel POSTGRES_URL enables saved-key status without DATABASE_URL", () => {
+  const keys = [
+    "AUTH_PROVIDER",
+    "DATABASE_URL",
+    "POSTGRES_URL",
+    "API_KEY_ENCRYPTION_SECRET",
+  ] as const;
+  const previous = Object.fromEntries(
+    keys.map((key) => [key, process.env[key]]),
+  );
+  try {
+    delete process.env.AUTH_PROVIDER;
+    delete process.env.DATABASE_URL;
+    process.env.POSTGRES_URL =
+      "postgres://test:example@database.invalid/postgres";
+    process.env.API_KEY_ENCRYPTION_SECRET = master;
+    assert.equal(keyStorageConfigured(), true);
+    delete process.env.API_KEY_ENCRYPTION_SECRET;
+    assert.equal(keyStorageConfigured(), false);
+  } finally {
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  }
+});
 
 test("credentials use randomized authenticated encryption bound to their owner", async () => {
   const previous = process.env.API_KEY_ENCRYPTION_SECRET;
