@@ -27,6 +27,11 @@ export function database(): Database {
       503,
     );
   connection ??= postgres(process.env.DATABASE_URL, {
+    ssl: ["localhost", "127.0.0.1", "[::1]"].includes(
+      new URL(process.env.DATABASE_URL).hostname,
+    )
+      ? false
+      : "verify-full",
     max: 3,
     prepare: false,
     idle_timeout: 20,

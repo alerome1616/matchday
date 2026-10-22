@@ -9,6 +9,11 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 const sql = postgres(process.env.DATABASE_URL, {
+  ssl: ["localhost", "127.0.0.1", "[::1]"].includes(
+    new URL(process.env.DATABASE_URL).hostname,
+  )
+    ? false
+    : "verify-full",
   max: 1,
   prepare: false,
   connect_timeout: 10,
