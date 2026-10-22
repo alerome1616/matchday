@@ -23,10 +23,10 @@ test(
       const owners = await sql.unsafe(
         "SELECT DISTINCT user_id FROM matchday_images LIMIT 100",
       );
-      const adapter = {
-        query: async (text: string, values: unknown[] = []) =>
-          sql.unsafe(text, values as never[]),
-      } as Database;
+      const adapter: Pick<Database, "query"> = {
+        query: async <T extends object>(text: string, values: unknown[] = []) =>
+          (await sql.unsafe(text, values as never[])) as unknown as T[],
+      };
       let count = 0;
       for (const owner of owners) {
         const page = await listOwnImages(owner.user_id, 0, adapter);

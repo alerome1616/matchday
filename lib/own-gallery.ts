@@ -14,7 +14,7 @@ export type OwnImage = {
 export async function listOwnImages(
   owner: string,
   page: number,
-  db: Database = database(),
+  db: Pick<Database, "query"> = database(),
 ) {
   const rows = await db.query<OwnImage>(
     `SELECT id,storage_path,fixture,settings,prompt,created_at FROM matchday_images WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 25 OFFSET $2`,
