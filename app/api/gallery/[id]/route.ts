@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { bucket } from "@/lib/config";
+import { bucket, getConfig } from "@/lib/config";
+import { del } from "@vercel/blob";
+import { requireAccount } from "@/lib/auth";
+import { ownImage } from "@/lib/own-gallery";
+import { database } from "@/lib/database";
 import { requireUser } from "@/lib/supabase/server";
 import { AppError, errorResponse, protectMutation } from "@/lib/errors";
 import { z } from "zod";
@@ -14,6 +18,16 @@ export async function DELETE(
       .string()
       .uuid()
       .parse((await params).id);
+    if (getConfig().authProvider === "postgres") {
+      const user = await requireAccount();
+      const row = await ownImage(user.id, id);
+      await del(row.storage_path);
+      await database().query(
+        "DELETE FROM matchday_images WHERE id=$1 AND user_id=$2",
+        [id, user.id],
+      );
+      return NextResponse.json({ ok: true });
+    }
     const { db, user } = await requireUser();
     const { data, error } = await db
       .from("generated_images")

@@ -58,4 +58,5 @@ export type ReferenceRole = (typeof referenceRoles)[number]["id"];
 export type ReferenceInstruction = { role: ReferenceRole; notes: string };
 export const MAX_REFERENCE_FILES = 4;
 export const MAX_REFERENCE_BYTES = 4 * 1024 * 1024;
-export const MAX_TOTAL_REFERENCE_BYTES = 8 * 1024 * 1024;
+// Leave room for multipart metadata under Vercel's request body limit.
+export const MAX_TOTAL_REFERENCE_BYTES = 4 * 1024 * 1024;

@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import type {
   Fixture,
   FixturesSource,
@@ -9,6 +8,7 @@ import type {
   Settings,
   ReferenceImage,
   ApiKeyStatus,
+  StudioUser,
 } from "@/lib/types";
 import { defaultSettings, upgradeCreativeSettings } from "@/lib/defaults";
 import { createClient } from "@/lib/supabase/client";
@@ -25,7 +25,21 @@ import {
   deleteLocalImage,
 } from "@/lib/local-gallery";
 import { settingsSchema } from "@/lib/validation";
+import {
+  toggleMatch,
+  selectVisible,
+  selectionKey,
+  type SelectedMatch,
+} from "@/lib/selection";
 export type View = "matches" | "gallery" | "styles" | "settings";
+class HttpError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     cache: "no-store",
@@ -39,7 +53,10 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const data = (await res.json()) as T & { error?: string };
   if (!res.ok)
-    throw new Error(data.error ?? "No se pudo completar la operación.");
+    throw new HttpError(
+      data.error ?? "No se pudo completar la operación.",
+      res.status,
+    );
   return data;
 }
 export function useStudio(config: RuntimeConfig) {
@@ -64,10 +81,13 @@ export function useStudio(config: RuntimeConfig) {
     null,
   );
   const [fixturesRevision, setFixturesRevision] = useState(0);
-  const [selected, setSelected] = useState<number[]>([]);
+  const [selectedMatches, setSelectedMatches] = useState<SelectedMatch[]>([]);
+  const selected = selectedMatches.map((match) => match.key);
+  const stopRequested = useRef(false);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [images, setImages] = useState<GalleryImage[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<StudioUser | null>(null);
+  const authVersion = useRef(0);
   const [authReady, setAuthReady] = useState(config.demo);
   const [authOpen, setAuthOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -84,6 +104,20 @@ export function useStudio(config: RuntimeConfig) {
   userIdRef.current = user?.id ?? null;
   const busy = useRef(false);
   const settingsDirty = useRef(false);
+  const updateAccount = useCallback((account: StudioUser | null) => {
+    if (userIdRef.current !== (account?.id ?? null)) {
+      setApiKey("");
+      setKeyStatus(null);
+      setImages([]);
+      setSelectedMatches([]);
+      setSettings(defaultSettings);
+      referencesRef.current.forEach((r) => URL.revokeObjectURL(r.preview));
+      setReferences([]);
+    }
+    userIdRef.current = account?.id ?? null;
+    setUser(account);
+    setAuthReady(true);
+  }, []);
   useEffect(() => {
     if (config.demo) {
       try {
@@ -137,6 +171,35 @@ export function useStudio(config: RuntimeConfig) {
       setAuthReady(true);
       return;
     }
+    if (config.authProvider === "postgres") {
+      let active = true;
+      const refresh = async () => {
+        const version = authVersion.current;
+        try {
+          const result = await api<{ user: StudioUser | null }>(
+            "/api/auth/session",
+          );
+          if (active && version === authVersion.current)
+            updateAccount(result.user);
+        } catch {
+          if (active) {
+            setAuthReady(true);
+            setError("No se pudo comprobar tu sesión.");
+          }
+        }
+      };
+      const changed = (event: StorageEvent) => {
+        if (event.key === "matchday:auth:event") void refresh();
+      };
+      void refresh();
+      window.addEventListener("focus", refresh);
+      window.addEventListener("storage", changed);
+      return () => {
+        active = false;
+        window.removeEventListener("focus", refresh);
+        window.removeEventListener("storage", changed);
+      };
+    }
     const db = createClient();
     db.auth
       .getUser()
@@ -158,13 +221,13 @@ export function useStudio(config: RuntimeConfig) {
         setReferences([]);
         setImages([]);
         setSettings(defaultSettings);
-        setSelected([]);
+        setSelectedMatches([]);
       }
       setUser(session?.user ?? null);
       setAuthReady(true);
     });
     return () => subscription.unsubscribe();
-  }, [config.demo, config.configured]);
+  }, [config.demo, config.configured, config.authProvider, updateAccount]);
   useEffect(() => {
     setKeyStatus(null);
     if (!user || config.demo) return;
@@ -242,7 +305,7 @@ export function useStudio(config: RuntimeConfig) {
   useEffect(() => {
     if (!config.demo && !user) {
       setFixtures([]);
-      setSelected([]);
+      setSelectedMatches([]);
       return;
     }
     let active = true;
@@ -250,7 +313,6 @@ export function useStudio(config: RuntimeConfig) {
     setFixtures([]);
     setFixturesSource(null);
     setError("");
-    setSelected([]);
     api<{ fixtures: Fixture[]; source: FixturesSource }>(
       "/api/fixtures?date=" + date,
     )
@@ -353,13 +415,9 @@ export function useStudio(config: RuntimeConfig) {
     }
   }
   function toggle(id: number) {
-    setSelected((s) =>
-      s.includes(id)
-        ? s.filter((x) => x !== id)
-        : s.length < 4
-          ? [...s, id]
-          : s,
-    );
+    const fixture = fixtures.find((f) => f.id === id);
+    if (fixture)
+      setSelectedMatches((current) => toggleMatch(current, fixture, date));
   }
   function addReferences(files: File[]) {
     if (references.length + files.length > MAX_REFERENCE_FILES) {
@@ -383,7 +441,7 @@ export function useStudio(config: RuntimeConfig) {
         0,
       ) > MAX_TOTAL_REFERENCE_BYTES
     ) {
-      setError("El total de referencias no puede superar 8 MB.");
+      setError("El total de referencias no puede superar 4 MB.");
       return;
     }
     setReferences((current) => [
@@ -429,14 +487,15 @@ export function useStudio(config: RuntimeConfig) {
     busy.current = true;
     setGenerating(true);
     setError("");
-    const batch = fixtures.filter((f) => selected.includes(f.id));
+    const batch = structuredClone(selectedMatches);
+    stopRequested.current = false;
     const snapshot = structuredClone(settings);
     const referenceSnapshot = [...references];
     const instructions = referenceSnapshot.map(({ role, notes }) => ({
       role,
       notes,
     }));
-    const temporaryKey = apiKey.trim();
+    let temporaryKey = apiKey.trim();
     const owner = userIdRef.current;
     setProgress({ done: 0, total: batch.length });
     let success = 0;
@@ -444,11 +503,12 @@ export function useStudio(config: RuntimeConfig) {
     try {
       for (let i = 0; i < batch.length; i++) {
         if (owner !== userIdRef.current) return;
-        const f = batch[i];
+        if (stopRequested.current) break;
+        const { fixture: f, date: fixtureDate, key: selectedKey } = batch[i];
         try {
           const payload = {
             fixtureIds: [f.id],
-            date,
+            date: fixtureDate,
             settings: snapshot,
             requestId: crypto.randomUUID(),
             references: instructions,
@@ -466,7 +526,10 @@ export function useStudio(config: RuntimeConfig) {
             });
             if (!response.ok) {
               const error = (await response.json()) as { error?: string };
-              throw new Error(error.error ?? "No se pudo generar la imagen.");
+              throw new HttpError(
+                error.error ?? "No se pudo generar la imagen.",
+                response.status,
+              );
             }
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
@@ -498,14 +561,34 @@ export function useStudio(config: RuntimeConfig) {
               body: form,
               headers: {},
             });
+            if (owner !== userIdRef.current) return;
+            if (temporaryKey && config.authProvider === "postgres") {
+              setKeyStatus({
+                available: true,
+                saved: true,
+                suffix: temporaryKey.slice(-4),
+              });
+              setApiKey("");
+              temporaryKey = "";
+            }
           }
 
           success++;
-          setSelected((ids) => ids.filter((id) => id !== f.id));
+          setSelectedMatches((matches) =>
+            matches.filter((match) => match.key !== selectedKey),
+          );
         } catch (e) {
           failures.push(
-            f.home.short + "–" + f.away.short + ": " + (e as Error).message,
+            fixtureDate +
+              " · " +
+              f.home.short +
+              "–" +
+              f.away.short +
+              ": " +
+              (e as Error).message,
           );
+          if (e instanceof HttpError && [401, 403, 429, 503].includes(e.status))
+            break;
         }
         setProgress({ done: i + 1, total: batch.length });
       }
@@ -559,10 +642,21 @@ export function useStudio(config: RuntimeConfig) {
   async function logout() {
     if (generating) return;
     try {
-      await createClient().auth.signOut();
+      authVersion.current++;
+      if (config.authProvider === "postgres")
+        await api("/api/auth/logout", { method: "POST" });
+      else await createClient().auth.signOut();
+      authVersion.current++;
+      updateAccount(null);
+      try {
+        localStorage.setItem("matchday:auth:event", crypto.randomUUID());
+      } catch {
+        /* Session is already revoked on the server. */
+      }
       setApiKey("");
       setKeyStatus(null);
       setUser(null);
+      setSelectedMatches([]);
       setImages([]);
       setSettings(defaultSettings);
       setView("matches");
@@ -596,7 +690,19 @@ export function useStudio(config: RuntimeConfig) {
     fixturesSource,
     refreshFixtures: () => setFixturesRevision((r) => r + 1),
     selected,
-    setSelected,
+    selectedMatches,
+    isSelected: (id: number) => selected.includes(selectionKey(date, id)),
+    toggleVisible: (visible: Fixture[]) =>
+      setSelectedMatches((current) => selectVisible(current, visible, date)),
+    removeSelected: (key: string) =>
+      setSelectedMatches((current) =>
+        current.filter((match) => match.key !== key),
+      ),
+    clearSelection: () => setSelectedMatches([]),
+    stopGeneration: () => {
+      stopRequested.current = true;
+      setMessage("Se detendrá al terminar la imagen en curso.");
+    },
     toggle,
     settings,
     updateSettings,
@@ -604,6 +710,15 @@ export function useStudio(config: RuntimeConfig) {
     saved,
     images,
     user,
+    onAuthenticated: (account: StudioUser) => {
+      authVersion.current++;
+      updateAccount(account);
+      try {
+        localStorage.setItem("matchday:auth:event", crypto.randomUUID());
+      } catch {
+        /* No credentials stored in the browser. */
+      }
+    },
     authReady,
     authOpen,
     setAuthOpen,

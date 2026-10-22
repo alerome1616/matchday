@@ -3,6 +3,8 @@ import { getConfig } from "@/lib/config";
 import { defaultSettings } from "@/lib/defaults";
 import { requireUser } from "@/lib/supabase/server";
 import { settingsSchema } from "@/lib/validation";
+import { requireAccount } from "@/lib/auth";
+import { database } from "@/lib/database";
 import {
   AppError,
   errorResponse,
@@ -14,6 +16,17 @@ export async function GET() {
   try {
     if (getConfig().demo)
       return NextResponse.json({ settings: defaultSettings });
+    if (getConfig().authProvider === "postgres") {
+      const user = await requireAccount();
+      const [row] = await database().query<{ settings: unknown }>(
+        "SELECT settings FROM matchday_settings WHERE user_id=$1",
+        [user.id],
+      );
+      return NextResponse.json(
+        { settings: row?.settings ?? defaultSettings },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
     const { db, user } = await requireUser();
     const { data, error } = await db
       .from("design_settings")
@@ -37,14 +50,21 @@ export async function PUT(req: Request) {
         "En demo, la configuración se guarda en este navegador.",
       );
     const settings = settingsSchema.parse(await readJson(req));
+    if (getConfig().authProvider === "postgres") {
+      const user = await requireAccount();
+      await database().query(
+        `INSERT INTO matchday_settings (user_id,settings) VALUES ($1,$2::jsonb)
+        ON CONFLICT (user_id) DO UPDATE SET settings=excluded.settings`,
+        [user.id, JSON.stringify(settings)],
+      );
+      return NextResponse.json({ settings });
+    }
     const { db, user } = await requireUser();
-    const { error } = await db
-      .from("design_settings")
-      .upsert({
-        user_id: user.id,
-        settings,
-        updated_at: new Date().toISOString(),
-      });
+    const { error } = await db.from("design_settings").upsert({
+      user_id: user.id,
+      settings,
+      updated_at: new Date().toISOString(),
+    });
     if (error) throw error;
     return NextResponse.json({ settings });
   } catch (e) {

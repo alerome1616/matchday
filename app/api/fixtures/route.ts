@@ -3,12 +3,12 @@ import { getConfig } from "@/lib/config";
 import { footballProvider } from "@/lib/adapters/football";
 import { dateSchema } from "@/lib/validation";
 import { errorResponse } from "@/lib/errors";
-import { requireUser } from "@/lib/supabase/server";
+import { requireAccount } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const config = getConfig();
-    if (!config.demo) await requireUser();
+    if (!config.demo) await requireAccount();
     const date = dateSchema.parse(new URL(req.url).searchParams.get("date"));
     const fixtures = await footballProvider(config.footballProvider).fixtures(
       date,

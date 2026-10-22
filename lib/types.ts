@@ -36,6 +36,7 @@ export type GalleryImage = {
   demo: boolean;
 };
 export type RuntimeConfig = {
+  authProvider: "postgres" | "supabase" | "local";
   demo: boolean;
   footballMock: boolean;
   footballProvider: import("./football-config").FootballSource;
@@ -43,6 +44,7 @@ export type RuntimeConfig = {
   configured: boolean;
   generationConfigured: boolean;
 };
+export type StudioUser = { id: string; email?: string };
 export type ApiKeyStatus = {
   available: boolean;
   saved: boolean;

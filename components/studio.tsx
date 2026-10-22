@@ -52,6 +52,10 @@ export function Studio({ config }: { config: RuntimeConfig }) {
   const [search, setSearch] = useState("");
   const [league, setLeague] = useState("Todas");
   const [helpTab, setHelpTab] = useState(false);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  useEffect(() => {
+    if (app.view !== "matches") setGeneratorOpen(false);
+  }, [app.view]);
   useEffect(() => {
     if (app.message) {
       const t = setTimeout(() => app.setMessage(""), 4500);
@@ -315,7 +319,8 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                     </span>
                   </div>
                   <p className="section-description">
-                    Selecciona hasta 4 partidos y empieza a crear.
+                    Selecciona partidos de uno o varios días. Tu lista se
+                    mantiene al cambiar de fecha.
                   </p>
                   <div className="date-toolbar">
                     <div className="date-switch">
@@ -457,18 +462,12 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                     <button
                       className="text-button"
                       disabled={app.generating || !filtered.length}
-                      onClick={() =>
-                        app.setSelected(
-                          filtered.every((f) => app.selected.includes(f.id))
-                            ? []
-                            : filtered.slice(0, 4).map((f) => f.id),
-                        )
-                      }
+                      onClick={() => app.toggleVisible(filtered)}
                     >
                       {filtered.length &&
-                      filtered.every((f) => app.selected.includes(f.id))
-                        ? "Quitar selección"
-                        : "Seleccionar " + Math.min(filtered.length, 4)}
+                      filtered.every((f) => app.isSelected(f.id))
+                        ? "Quitar los de esta vista"
+                        : "Seleccionar " + filtered.length}
                     </button>
                   </div>
                   {app.loading ? (
@@ -487,12 +486,8 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                         <FixtureCard
                           key={f.id}
                           fixture={f}
-                          selected={app.selected.includes(f.id)}
-                          disabled={
-                            app.generating ||
-                            (!app.selected.includes(f.id) &&
-                              app.selected.length >= 4)
-                          }
+                          selected={app.isSelected(f.id)}
+                          disabled={app.generating}
                           onToggle={() => app.toggle(f.id)}
                         />
                       ))}
@@ -515,12 +510,14 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                     </span>
                     <span>
                       <i />
-                      {app.selected.length}/4 seleccionados
+                      {app.selected.length} seleccionados
                     </span>
                   </div>
                   <CreativeIdeas app={app} compact />
                 </section>
-                <SettingsPanel app={app} />
+                <div className="desktop-generator">
+                  <SettingsPanel app={app} />
+                </div>
               </div>
             </>
           ) : app.view === "gallery" ? (
@@ -588,7 +585,7 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                     </dd>
                     <dt>Galería</dt>
                     <dd>
-                      {config.demo ? "Este navegador" : "Supabase · privada"}
+                      {config.demo ? "Este navegador" : "Tu cuenta · privada"}
                     </dd>
                     <dt>Zona horaria</dt>
                     <dd>Europe/Madrid</dd>
@@ -623,7 +620,59 @@ export function Studio({ config }: { config: RuntimeConfig }) {
         onClose={() => app.setAuthOpen(false)}
         config={config}
         email={app.user?.email}
+        onAuthenticated={app.onAuthenticated}
       />
+      {(config.demo || app.user) && app.view === "matches" && (
+        <>
+          <div className="mobile-generator-bar">
+            <div>
+              <strong>{app.selected.length} partidos</strong>
+              <small>
+                {app.generating
+                  ? `Generando ${app.progress.done}/${app.progress.total}`
+                  : "Tu selección de varios días"}
+              </small>
+            </div>
+            <button className="primary" onClick={() => setGeneratorOpen(true)}>
+              <Sparkles size={17} /> Abrir generador
+            </button>
+          </div>
+          <Modal
+            open={generatorOpen}
+            onClose={() => setGeneratorOpen(false)}
+            title="Tu generador"
+            className="generator-drawer"
+          >
+            <div className="generator-quick-actions">
+              <button
+                className="primary"
+                disabled={
+                  !app.selected.length || !app.canGenerate || app.generating
+                }
+                onClick={app.generate}
+              >
+                <Sparkles size={17} />
+                {app.generating
+                  ? `Generando ${app.progress.done}/${app.progress.total}…`
+                  : `Generar ${app.selected.length} imágenes`}
+              </button>
+              {app.generating ? (
+                <button className="text-button" onClick={app.stopGeneration}>
+                  Detener tras esta imagen
+                </button>
+              ) : (
+                <p>
+                  {app.canGenerate
+                    ? "Una imagen por partido · consumo de tu API"
+                    : "Conecta tu clave de OpenAI para generar."}
+                </p>
+              )}
+              {app.error && <p role="alert">{app.error}</p>}
+            </div>
+            <SettingsPanel app={app} expanded />
+          </Modal>
+        </>
+      )}
       <Modal
         open={help}
         onClose={() => setHelp(false)}
@@ -640,8 +689,8 @@ export function Studio({ config }: { config: RuntimeConfig }) {
               </p>
               <ol>
                 <li>
-                  Crea un proyecto en Supabase y aplica las tres migraciones
-                  incluidas, en orden.
+                  Activa el servicio de cuentas y el almacenamiento privado de
+                  tu estudio.
                 </li>
                 <li>
                   Configura las variables del archivo de ejemplo en tu servidor.
@@ -654,7 +703,9 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                   Entra en tu cuenta y guarda tu clave de OpenAI en Conectar
                   OpenAI.
                 </li>
-                <li>Desactiva el modo demo y reinicia la aplicación.</li>
+                <li>
+                  Consulta la guía de instalación incluida en el proyecto.
+                </li>
               </ol>
               <p>
                 Encontrarás todos los pasos en el README del proyecto. Las
@@ -667,7 +718,7 @@ export function Studio({ config }: { config: RuntimeConfig }) {
               <ol>
                 <li>
                   <strong>Elige tu jornada.</strong> Busca por fecha, equipo o
-                  competición y selecciona hasta 4 partidos.
+                  competición y añade partidos de distintos días a tu lista.
                 </li>
                 <li>
                   <strong>Dale tu estilo.</strong> Ajusta el diseño, el formato

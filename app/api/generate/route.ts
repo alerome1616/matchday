@@ -7,12 +7,14 @@ import { requireUser } from "@/lib/supabase/server";
 import { readGenerationRequest } from "@/lib/generation-request";
 import { buildPrompt } from "@/lib/prompt";
 import { AppError, errorResponse, protectMutation } from "@/lib/errors";
+import { generateOwn } from "@/lib/own-generation";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export async function POST(req: Request) {
   try {
     protectMutation(req);
     const config = getConfig();
+    if (config.authProvider === "postgres") return await generateOwn(req);
     if (config.demo)
       throw new AppError(
         "Introduce una clave temporal en Conexión o activa la generación del servidor.",

@@ -1,5 +1,5 @@
 import { createAccountKeyHandlers } from "@/lib/account-key-handlers";
-import { requireUser } from "@/lib/supabase/server";
+import { requireAccount } from "@/lib/auth";
 import {
   getApiKeyStatus,
   saveUserApiKey,
@@ -7,7 +7,7 @@ import {
 } from "@/lib/user-api-key";
 export const dynamic = "force-dynamic";
 export const { GET, PUT, DELETE } = createAccountKeyHandlers({
-  authenticate: async () => (await requireUser()).user.id,
+  authenticate: async () => (await requireAccount()).id,
   status: getApiKeyStatus,
   save: saveUserApiKey,
   remove: deleteUserApiKey,

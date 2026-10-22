@@ -12,6 +12,7 @@ test(
     const config = (await c.json()) as Record<string, unknown>;
     assert.equal(config.demo, true);
     assert.deepEqual(Object.keys(config).sort(), [
+      "authProvider",
       "configured",
       "demo",
       "footballMock",

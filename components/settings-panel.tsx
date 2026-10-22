@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   ArrowUpRight,
   Check,
@@ -20,6 +20,7 @@ import { buildPrompt } from "@/lib/prompt";
 import type { StudioState } from "@/hooks/use-studio";
 import { ReferenceUploader } from "./reference-uploader";
 import { Modal } from "./modal";
+import { SelectionList } from "./selection-list";
 export function SettingsPanel({
   app,
   expanded = false,
@@ -29,6 +30,7 @@ export function SettingsPanel({
 }) {
   const { settings, updateSettings } = app;
   const [preview, setPreview] = useState(false);
+  const prefix = useId();
   return (
     <section
       className={
@@ -46,11 +48,11 @@ export function SettingsPanel({
       <p className="panel-intro">
         Imágenes originales con escenas, camisetas y referencias.
       </p>
-      <label className="field-label" htmlFor="scene">
+      <label className="field-label" htmlFor={prefix + "scene"}>
         Escena
       </label>
       <select
-        id="scene"
+        id={prefix + "scene"}
         className="creative-select"
         value={settings.scene ?? "stadium"}
         disabled={app.generating}
@@ -70,13 +72,13 @@ export function SettingsPanel({
             ?.description
         }
       </p>
-      <label className="field-label" htmlFor="style">
+      <label className="field-label" htmlFor={prefix + "style"}>
         Acabado visual
       </label>
       <div className="select-wrap">
         <Clapperboard size={16} />
         <select
-          id="style"
+          id={prefix + "style"}
           value={settings.style}
           disabled={app.generating}
           onChange={(e) =>
@@ -117,12 +119,12 @@ export function SettingsPanel({
           );
         })}
       </div>
-      <label className="field-label" htmlFor="headline">
+      <label className="field-label" htmlFor={prefix + "headline"}>
         Titular para la imagen
       </label>
       <input
         className="creative-input"
-        id="headline"
+        id={prefix + "headline"}
         value={settings.headline ?? ""}
         placeholder="Ej.: ORGULLO EN JUEGO"
         maxLength={160}
@@ -133,14 +135,14 @@ export function SettingsPanel({
         Déjalo vacío si tu prompt ya define el texto o no quieres titular.
       </p>
       <div className="prompt-heading">
-        <label htmlFor="prompt">Prompt maestro</label>
+        <label htmlFor={prefix + "prompt"}>Prompt maestro</label>
         <span>
           EDITABLE
           <ArrowUpRight size={11} />
         </span>
       </div>
       <textarea
-        id="prompt"
+        id={prefix + "prompt"}
         value={settings.prompt}
         maxLength={4000}
         minLength={20}
@@ -166,10 +168,11 @@ export function SettingsPanel({
         </button>
       </div>
       <ReferenceUploader app={app} />
+      <SelectionList app={app} />
       <div className="quality-row">
-        <label htmlFor="quality">Calidad</label>
+        <label htmlFor={prefix + "quality"}>Calidad</label>
         <select
-          id="quality"
+          id={prefix + "quality"}
           value={settings.quality}
           disabled={app.generating}
           onChange={(e) =>
@@ -200,14 +203,14 @@ export function SettingsPanel({
             utilizará automáticamente al generar.
           </p>
         )}
-        <label htmlFor="openai-key">
+        <label htmlFor={prefix + "openai-key"}>
           {app.user
             ? app.keyStatus?.saved
               ? "Sustituir clave de OpenAI"
               : "Tu clave de OpenAI"
             : "Clave temporal de API"}
           <input
-            id="openai-key"
+            id={prefix + "openai-key"}
             type="password"
             value={app.apiKey}
             autoComplete="off"
@@ -219,7 +222,9 @@ export function SettingsPanel({
         </label>
         <p>
           {app.user
-            ? "Guarda tu clave para usarla al volver a iniciar sesión, también desde otro dispositivo. Se cifra en el servidor y nunca se devuelve completa al navegador."
+            ? app.config.authProvider === "postgres"
+              ? "Tu clave se guarda cifrada en tu cuenta al generar. También puedes guardarla ahora para usarla en tus próximas sesiones."
+              : "Guarda tu clave para usarla al volver a iniciar sesión, también desde otro dispositivo. Se cifra en el servidor y nunca se devuelve completa al navegador."
             : "La clave temporal se olvida al recargar. Inicia sesión para poder guardarla en tu cuenta."}
         </p>
         {app.user && (
@@ -302,6 +307,11 @@ export function SettingsPanel({
             : "Generar con OpenAI"}
           {!app.generating && <ArrowUpRight size={18} />}
         </button>
+        {app.generating && (
+          <button className="secondary" onClick={app.stopGeneration}>
+            Detener tras esta imagen
+          </button>
+        )}
         <p>
           {app.canGenerate
             ? "Envía el prompt y las referencias a OpenAI · consumo de API"
@@ -318,22 +328,20 @@ export function SettingsPanel({
           Se generará una imagen por partido, con las {app.references.length}{" "}
           referencias adjuntas.
         </p>
-        {app.fixtures
-          .filter((f) => app.selected.includes(f.id))
-          .map((f) => (
-            <div className="prompt-final" key={f.id}>
-              <h3>
-                {f.home.name} × {f.away.name}
-              </h3>
-              <pre>
-                {buildPrompt(
-                  f,
-                  settings,
-                  app.references.map(({ role, notes }) => ({ role, notes })),
-                )}
-              </pre>
-            </div>
-          ))}
+        {app.selectedMatches.map(({ fixture: f, key, date }) => (
+          <div className="prompt-final" key={key}>
+            <h3>
+              {f.home.name} × {f.away.name} · {date}
+            </h3>
+            <pre>
+              {buildPrompt(
+                f,
+                settings,
+                app.references.map(({ role, notes }) => ({ role, notes })),
+              )}
+            </pre>
+          </div>
+        ))}
       </Modal>
     </section>
   );

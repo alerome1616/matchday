@@ -1,12 +1,16 @@
 "use client";
+import { useId } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { referenceRoles } from "@/lib/creative";
 import type { StudioState } from "@/hooks/use-studio";
 export function ReferenceUploader({ app }: { app: StudioState }) {
+  const prefix = useId();
   return (
     <section className="reference-section">
       <div className="prompt-heading">
-        <label htmlFor="reference-files">Imágenes de referencia</label>
+        <label htmlFor={prefix + "reference-files"}>
+          Imágenes de referencia
+        </label>
         <span>{app.references.length}/4</span>
       </div>
       <label
@@ -21,9 +25,9 @@ export function ReferenceUploader({ app }: { app: StudioState }) {
         <ImagePlus size={24} />
         <strong>Añade camisetas, una escena o un estilo</strong>
         <span>Arrastra imágenes o pulsa para elegir</span>
-        <small>PNG, JPG, WebP · hasta 4 MB por imagen · 8 MB en total</small>
+        <small>PNG, JPG, WebP · hasta 4 MB en total</small>
         <input
-          id="reference-files"
+          id={prefix + "reference-files"}
           type="file"
           accept="image/png,image/jpeg,image/webp"
           multiple
@@ -39,11 +43,11 @@ export function ReferenceUploader({ app }: { app: StudioState }) {
           <article key={ref.id} className="reference-item">
             <img src={ref.preview} alt={"Referencia " + (index + 1)} />
             <div>
-              <label htmlFor={"ref-role-" + ref.id}>
+              <label htmlFor={prefix + "ref-role-" + ref.id}>
                 Referencia {index + 1}
               </label>
               <select
-                id={"ref-role-" + ref.id}
+                id={prefix + "ref-role-" + ref.id}
                 value={ref.role}
                 disabled={app.generating}
                 onChange={(e) =>
