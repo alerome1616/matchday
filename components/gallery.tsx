@@ -11,13 +11,15 @@ import {
 import type { StudioState } from "@/hooks/use-studio";
 import type { GalleryImage } from "@/lib/types";
 import { styles, formats } from "@/lib/defaults";
+import { galleryRecords } from "@/lib/gallery-records";
 import { Modal } from "./modal";
 export function Gallery({ app }: { app: StudioState }) {
   const [detail, setDetail] = useState<GalleryImage | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [search, setSearch] = useState("");
-  const visible = app.images.filter((i) =>
+  const records = galleryRecords(app.images);
+  const visible = records.images.filter((i) =>
     (i.fixture.home.name + " " + i.fixture.away.name + " " + i.fixture.league)
       .toLowerCase()
       .includes(search.toLowerCase()),
@@ -65,6 +67,12 @@ export function Gallery({ app }: { app: StudioState }) {
           </button>
         )}
       </div>
+      {records.unreadable > 0 && (
+        <p className="gallery-data-warning" role="alert">
+          No se han podido leer los datos de {records.unreadable} diseños. Sus
+          archivos siguen guardados; los demás se muestran a continuación.
+        </p>
+      )}
       {app.galleryLoading && app.images.length === 0 ? (
         <div className="empty">
           <LoaderCircle className="spin" />
@@ -98,7 +106,7 @@ export function Gallery({ app }: { app: StudioState }) {
                   loading="lazy"
                 />
                 <span className="poster-type">
-                  {formats[i.settings.format].ratio}
+                  {formats[i.settings.format]?.ratio ?? "Formato libre"}
                   {i.demo ? " · DEMO" : ""}
                 </span>
               </button>
@@ -198,7 +206,9 @@ export function Gallery({ app }: { app: StudioState }) {
                   {styles.find((s) => s.id === detail.settings.style)?.name}
                 </dd>
                 <dt>Formato</dt>
-                <dd>{formats[detail.settings.format].ratio}</dd>
+                <dd>
+                  {formats[detail.settings.format]?.ratio ?? "Formato libre"}
+                </dd>
                 <dt>Creado</dt>
                 <dd>{new Date(detail.created_at).toLocaleString("es-ES")}</dd>
               </dl>

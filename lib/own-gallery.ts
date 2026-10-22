@@ -2,6 +2,7 @@ import "server-only";
 import { database, type Database } from "./database";
 import type { Fixture, Settings, GalleryImage } from "./types";
 import { AppError } from "./errors";
+import { decodeStoredJson } from "./gallery-records";
 export type OwnImage = {
   id: string;
   storage_path: string;
@@ -22,8 +23,8 @@ export async function listOwnImages(
   return {
     images: rows.slice(0, 24).map((row): GalleryImage => ({
       id: row.id,
-      fixture: row.fixture,
-      settings: row.settings,
+      fixture: decodeStoredJson(row.fixture) as Fixture,
+      settings: decodeStoredJson(row.settings) as Settings,
       prompt: row.prompt,
       created_at: row.created_at.toISOString(),
       url: `/api/gallery/${row.id}/file`,

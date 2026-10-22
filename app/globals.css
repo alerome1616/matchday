@@ -3489,3 +3489,13 @@ input::placeholder {
 .selected-match > span { flex: 1; min-width: 0; }
 .selected-match .edit-match { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
 @media (max-width: 480px) { .selected-match { flex-wrap: wrap; } .selected-match > span { flex-basis: 100%; } }
+.gallery-data-warning {
+  padding: 14px 16px;
+  margin: 16px 0;
+  border: 1px solid #edddbb;
+  border-radius: 10px;
+  background: #fff9ed;
+  color: #79551b;
+  font-size: 14px;
+  line-height: 1.5;
+}

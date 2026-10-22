@@ -52,6 +52,8 @@ La guía [Activar cuentas y claves guardadas](docs/CUENTAS-SUPABASE.md) explica 
 
 ## Referencias y dirección creativa
 
+La galería recupera también metadatos que versiones anteriores guardaron como texto JSON. La lectura conserva el archivo original, el prompt y sus identificadores; no necesita regenerar ni borrar imágenes. Un registro con metadatos ilegibles muestra un aviso y permite seguir viendo los demás diseños. `npm run test:gallery-render` comprueba una galería con imágenes, datos históricos y formatos desconocidos. `npm run test:postgres-driver` verifica el controlador real cuando existe `DATABASE_URL` o `POSTGRES_URL`: prueba el guardado en una tabla temporal y comprueba la lectura de los metadatos existentes sin modificar los diseños ni mostrar sus contenidos.
+
 - Hasta 4 imágenes PNG, JPG o WebP, con un máximo de 4 MB en conjunto.
 - Validación de tamaño, MIME y firma binaria en servidor. No se aceptan SVG.
 - Cada imagen tiene una función: estilo/ambiente, camiseta local, camiseta visitante o composición. Admite una indicación adicional de hasta 500 caracteres.
