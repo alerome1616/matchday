@@ -10,7 +10,7 @@ export async function validateReferenceFiles(files: File[]) {
   if (files.length > MAX_REFERENCE_FILES)
     throw new AppError("Puedes adjuntar hasta 4 imágenes.");
   if (files.reduce((n, f) => n + f.size, 0) > MAX_TOTAL_REFERENCE_BYTES)
-    throw new AppError("Las referencias no pueden superar 8 MB en total.", 413);
+    throw new AppError("Las referencias no pueden superar 4 MB en total.", 413);
   for (const file of files) {
     if (!file.size || file.size > MAX_REFERENCE_BYTES)
       throw new AppError(
@@ -51,7 +51,7 @@ export async function readGenerationRequest(req: Request) {
     if (total > limit) {
       await reader.cancel();
       throw new AppError(
-        "La solicitud supera el límite de 8 MB de referencias.",
+        "La solicitud supera el límite de 4 MB de referencias.",
         413,
       );
     }

@@ -2,6 +2,14 @@
 
 Estudio web con Next.js, React y TypeScript para convertir partidos reales en imágenes originales mediante OpenAI. Interfaz blanca y verde oscuro, partidos por fecha y horario de Madrid.
 
+## Vercel: cuentas propias y selección de varios días
+
+La aplicación puede gestionar usuarios y sesiones en PostgreSQL propio. Sigue [Activar cuentas propias en Vercel](docs/VERCEL-POSTGRES.md): conecta `DATABASE_URL`, aplica `db/migrations/001_accounts.sql`, configura `AUTH_PROVIDER=postgres` y un `API_KEY_ENCRYPTION_SECRET` privado. Para guardar imágenes, conecta Vercel Blob privado mediante `BLOB_READ_WRITE_TOKEN`. No se necesita Supabase Auth en este modo. Subir el código no crea servicios ni configura credenciales automáticamente.
+
+Cada usuario conserva su clave de OpenAI cifrada entre sesiones. Puede guardarla desde el editor; al generar con una clave introducida y sesión iniciada también se guarda automáticamente. El navegador recibe solo el estado y los últimos cuatro caracteres. El backend valida la sesión y la cookie es HttpOnly.
+
+Puedes seleccionar más de cuatro partidos de varias fechas. Cambiar de día o filtro conserva la lista; quitar los partidos de la vista actual conserva los demás días. Cada imagen se genera por separado con la fecha de su encuentro. Puedes detener el lote después de la imagen en curso. En móvil, **Abrir generador** permanece en la barra inferior y abre un panel con acceso directo a generar. La selección se mantiene mientras usas el estudio y se vacía al recargar o cambiar de cuenta.
+
 ## Empezar
 
 Node.js 22.13+ y npm.
@@ -14,7 +22,7 @@ npm run dev
 
 En PowerShell: Copy-Item .env.example .env.local. Abre http://localhost:3000.
 
-Los partidos se consultan en ESPN por defecto. En el editor, elige una escena, un titular, el formato y el prompt. Adjunta imágenes, asígnales una función y selecciona hasta cuatro partidos. Abre **Conectar OpenAI** e introduce una clave de API temporal. Pulsa **Generar con OpenAI**. No se generan carteles SVG ni resultados simulados. Sin clave, la generación queda deshabilitada.
+Los partidos se consultan en ESPN por defecto. En el editor, elige una escena, un titular, el formato y el prompt. Adjunta imágenes, asígnales una función y selecciona partidos de uno o varios días. Abre **Conectar OpenAI** e introduce una clave de API temporal o utiliza la guardada en tu cuenta. Pulsa **Generar con OpenAI**. No se generan carteles SVG ni resultados simulados. Sin clave, la generación queda deshabilitada.
 
 ## Dos modos de almacenamiento
 
@@ -40,7 +48,7 @@ La guía [Activar cuentas y claves guardadas](docs/CUENTAS-SUPABASE.md) explica 
 
 ## Referencias y dirección creativa
 
-- Hasta 4 imágenes PNG, JPG o WebP. Máximo 4 MB por archivo y 8 MB en conjunto.
+- Hasta 4 imágenes PNG, JPG o WebP, con un máximo de 4 MB en conjunto.
 - Validación de tamaño, MIME y firma binaria en servidor. No se aceptan SVG.
 - Cada imagen tiene una función: estilo/ambiente, camiseta local, camiseta visitante o composición. Admite una indicación adicional de hasta 500 caracteres.
 - Se mantiene el orden de las imágenes en el prompt y en la petición multipart enviada a OpenAI.

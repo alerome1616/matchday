@@ -3,17 +3,19 @@ import { useState, type FormEvent } from "react";
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import { Modal } from "./modal";
 import { createClient } from "@/lib/supabase/client";
-import type { RuntimeConfig } from "@/lib/types";
+import type { RuntimeConfig, StudioUser } from "@/lib/types";
 export function AuthModal({
   open,
   onClose,
   config,
   email,
+  onAuthenticated,
 }: {
   open: boolean;
   onClose: () => void;
   config: RuntimeConfig;
   email?: string;
+  onAuthenticated: (user: StudioUser) => void;
 }) {
   const [register, setRegister] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -27,11 +29,30 @@ export function AuthModal({
     setError("");
     setNotice("");
     try {
-      const db = createClient();
       const credentials = {
         email: String(data.get("email")),
         password: String(data.get("password")),
       };
+      if (config.authProvider === "postgres") {
+        const response = await fetch(
+          `/api/auth/${register ? "register" : "login"}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(credentials),
+          },
+        );
+        const data = (await response.json()) as {
+          user?: StudioUser;
+          error?: string;
+        };
+        if (!response.ok || !data.user)
+          throw new Error(data.error || "No se pudo iniciar sesión.");
+        onAuthenticated(data.user);
+        onClose();
+        return;
+      }
+      const db = createClient();
       const result = register
         ? await db.auth.signUp({
             ...credentials,
@@ -44,11 +65,13 @@ export function AuthModal({
           "Revisa tu correo para confirmar la cuenta. Después podrás iniciar sesión.",
         );
       else onClose();
-    } catch {
+    } catch (e) {
       setError(
-        register
-          ? "No se pudo crear la cuenta. Revisa los datos y vuelve a intentarlo."
-          : "No se pudo iniciar sesión. Revisa tu correo y contraseña.",
+        config.authProvider === "postgres" && e instanceof Error
+          ? e.message
+          : register
+            ? "No se pudo crear la cuenta. Revisa los datos y vuelve a intentarlo."
+            : "No se pudo iniciar sesión. Revisa tu correo y contraseña.",
       );
     } finally {
       setBusy(false);
@@ -95,7 +118,7 @@ export function AuthModal({
           <p>
             {config.demo
               ? "Consulta los partidos y genera imágenes reales con tu clave temporal de OpenAI. Tu galería se guarda en este navegador."
-              : "Configura Supabase siguiendo el README para activar el registro y la galería privada."}
+              : "El servicio de cuentas está pendiente de activar. Contacta con el administrador del estudio."}
           </p>
           <button className="primary" onClick={onClose}>
             Explorar el estudio <ArrowRight size={17} />

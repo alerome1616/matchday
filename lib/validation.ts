@@ -24,7 +24,7 @@ export const generationSchema = z.object({
   fixtureIds: z
     .array(z.number().int().positive())
     .min(1)
-    .max(4)
+    .max(1)
     .refine((a) => new Set(a).size === a.length, "No repitas partidos."),
   date: dateSchema,
   settings: settingsSchema,
