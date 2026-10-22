@@ -14,7 +14,10 @@ import { z } from "zod";
 
 export function keyStorageConfigured() {
   if (getConfig().authProvider === "postgres")
-    return Boolean(process.env.DATABASE_URL && keyEncryptionConfigured());
+    return Boolean(
+      (process.env.DATABASE_URL || process.env.POSTGRES_URL) &&
+      keyEncryptionConfigured(),
+    );
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
     process.env.SUPABASE_SECRET_KEY &&
