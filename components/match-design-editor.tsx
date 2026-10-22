@@ -31,6 +31,10 @@ export function MatchDesignEditor({ app }: { app: StudioState }) {
         Personaliza este encuentro. Los demás siguen usando sus propios ajustes
         o la configuración general.
       </p>
+      <p className="field-hint">
+        Tu prompt propio define la escena. El formato, acabado visual y calidad
+        se toman de los ajustes generales.
+      </p>
       <fieldset disabled={app.generating}>
         <div className="prompt-heading">
           <label htmlFor={prefix + "prompt"}>

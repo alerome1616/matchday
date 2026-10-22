@@ -23,6 +23,7 @@ export function resolveMatchDesign(
       ...settings,
       prompt: draft?.prompt ?? settings.prompt,
       headline: draft?.headline ?? settings.headline,
+      scene: draft?.prompt !== undefined ? ("custom" as const) : settings.scene,
     },
     references: [
       ...(draft?.includeGeneralReferences === false ? [] : references),

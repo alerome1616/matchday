@@ -55,6 +55,7 @@ test("match overrides inherit current defaults and allow an explicitly empty tit
   assert.equal(own.settings.headline, "");
   assert.notEqual(own.settings.prompt, defaults.prompt);
   assert.equal(own.settings.format, defaults.format);
+  assert.equal(own.settings.scene, "custom");
   assert.deepEqual(defaults, original);
   const inherited = resolveMatchDesign(
     { ...defaults, prompt: "Nueva dirección creativa compartida" },
