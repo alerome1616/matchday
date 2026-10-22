@@ -68,8 +68,8 @@ export async function generateOwn(req: Request) {
           user.id,
           input.requestId,
           blob.url,
-          JSON.stringify(fixture),
-          JSON.stringify(input.settings),
+          fixture,
+          input.settings,
           prompt,
         ],
       );

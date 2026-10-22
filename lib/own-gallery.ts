@@ -2,6 +2,7 @@ import "server-only";
 import { database, type Database } from "./database";
 import type { Fixture, Settings, GalleryImage } from "./types";
 import { AppError } from "./errors";
+import { decodeStoredJson } from "./gallery-records";
 export type OwnImage = {
   id: string;
   storage_path: string;
@@ -13,7 +14,7 @@ export type OwnImage = {
 export async function listOwnImages(
   owner: string,
   page: number,
-  db: Database = database(),
+  db: Pick<Database, "query"> = database(),
 ) {
   const rows = await db.query<OwnImage>(
     `SELECT id,storage_path,fixture,settings,prompt,created_at FROM matchday_images WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 25 OFFSET $2`,
@@ -22,8 +23,8 @@ export async function listOwnImages(
   return {
     images: rows.slice(0, 24).map((row): GalleryImage => ({
       id: row.id,
-      fixture: row.fixture,
-      settings: row.settings,
+      fixture: decodeStoredJson(row.fixture) as Fixture,
+      settings: decodeStoredJson(row.settings) as Settings,
       prompt: row.prompt,
       created_at: row.created_at.toISOString(),
       url: `/api/gallery/${row.id}/file`,

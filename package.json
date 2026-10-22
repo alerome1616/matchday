@@ -24,7 +24,9 @@
     "format": "prettier --write app components hooks lib tests proxy.ts next.config.ts README.md docs",
     "test:fixtures": "node --conditions=react-server --import tsx --test tests/fixtures.test.ts",
     "test:creative": "node --conditions=react-server --import tsx --test tests/creative.test.ts",
-    "test:gallery": "tsx --test tests/local-gallery.test.ts"
+    "test:gallery": "tsx --test tests/local-gallery.test.ts",
+    "test:gallery-render": "tsx --tsconfig tests/tsconfig.react.json --test tests/gallery-render.test.tsx",
+    "test:postgres-driver": "node --env-file-if-exists=.env.local --conditions=react-server --import tsx --test tests/postgres-driver.test.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.0",

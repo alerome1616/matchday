@@ -99,8 +99,8 @@ test("PostgreSQL migration, registration, durable sessions, owner-isolated encry
         a.user.id,
         request,
         "https://private.example/image.png",
-        JSON.stringify(mockFixtures("2026-10-22")[0]),
-        JSON.stringify(defaultSettings),
+        mockFixtures("2026-10-22")[0],
+        defaultSettings,
         "Example prompt",
       ],
     );
@@ -108,7 +108,25 @@ test("PostgreSQL migration, registration, durable sessions, owner-isolated encry
       "UPDATE matchday_generation_requests SET status='succeeded' WHERE id=$1",
       [request],
     );
-    assert.equal((await listOwnImages(a.user.id, 0, db)).images.length, 1);
+    const expectedFixture = mockFixtures("2026-10-22")[0];
+    const currentGallery = await listOwnImages(a.user.id, 0, db);
+    assert.equal(currentGallery.images.length, 1);
+    assert.deepEqual(currentGallery.images[0].fixture, expectedFixture);
+    assert.deepEqual(currentGallery.images[0].settings, defaultSettings);
+    // Reproduce the JSON strings written by the old Postgres.js adapter.
+    await db.query(
+      "UPDATE matchday_images SET fixture=$2::jsonb,settings=$3::jsonb WHERE id=$1",
+      [
+        image,
+        JSON.stringify(JSON.stringify(expectedFixture)),
+        JSON.stringify(JSON.stringify(defaultSettings)),
+      ],
+    );
+    const recoveredGallery = await listOwnImages(a.user.id, 0, db);
+    assert.deepEqual(recoveredGallery.images[0].fixture, expectedFixture);
+    assert.deepEqual(recoveredGallery.images[0].settings, defaultSettings);
+    assert.equal(recoveredGallery.images[0].id, image);
+    assert.equal(recoveredGallery.images[0].url, `/api/gallery/${image}/file`);
     assert.equal((await listOwnImages(b.user.id, 0, db)).images.length, 0);
     await assert.rejects(() => ownImage(b.user.id, image, db), /no encontrada/);
     await assert.rejects(

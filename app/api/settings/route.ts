@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { settingsSchema } from "@/lib/validation";
 import { requireAccount } from "@/lib/auth";
 import { database } from "@/lib/database";
+import { decodeStoredJson } from "@/lib/gallery-records";
 import {
   AppError,
   errorResponse,
@@ -23,7 +24,7 @@ export async function GET() {
         [user.id],
       );
       return NextResponse.json(
-        { settings: row?.settings ?? defaultSettings },
+        { settings: decodeStoredJson(row?.settings) ?? defaultSettings },
         { headers: { "Cache-Control": "private, no-store" } },
       );
     }
@@ -55,7 +56,7 @@ export async function PUT(req: Request) {
       await database().query(
         `INSERT INTO matchday_settings (user_id,settings) VALUES ($1,$2::jsonb)
         ON CONFLICT (user_id) DO UPDATE SET settings=excluded.settings`,
-        [user.id, JSON.stringify(settings)],
+        [user.id, settings],
       );
       return NextResponse.json({ settings });
     }
