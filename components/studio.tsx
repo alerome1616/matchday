@@ -39,6 +39,7 @@ import { CreativeIdeas } from "./creative-ideas";
 import { Gallery } from "./gallery";
 import { AuthModal } from "./auth-modal";
 import { Modal } from "./modal";
+import { MatchDesignEditor } from "./match-design-editor";
 const navigation = [
   { id: "matches", label: "Partidos del día", Icon: CalendarDays },
   { id: "gallery", label: "Mi galería", Icon: Images },
@@ -615,6 +616,7 @@ export function Studio({ config }: { config: RuntimeConfig }) {
           </footer>
         </main>
       </div>
+      <MatchDesignEditor app={app} />
       <AuthModal
         open={app.authOpen}
         onClose={() => app.setAuthOpen(false)}

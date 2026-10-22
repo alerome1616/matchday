@@ -8,6 +8,8 @@ En tu proyecto de Vercel, abre **Storage → Create Database** y conecta una bas
 
 En **Settings → Environment Variables**, configura `DATABASE_URL` con la conexión privada proporcionada por el proveedor. Usa su URL con pool de conexiones y TLS. Si la integración crea la variable con otro nombre, añade `DATABASE_URL` con el valor correspondiente. No compartas esa URL: contiene la contraseña de la base de datos.
 
+Si tu integración ya proporciona `POSTGRES_URL`, la aplicación y `npm run db:migrate` la usan directamente; no necesitas copiar ni revelar la conexión. `DATABASE_URL` tiene prioridad cuando existen ambas. Una base PostgreSQL alojada en Supabase también sirve para este modo de cuentas propias, sin Supabase Auth. La migración activa RLS sin políticas públicas y revoca los permisos de `anon` y `authenticated` sobre las siete tablas para impedir el acceso mediante su API pública. Ejecútala con el propietario de la base.
+
 En el editor SQL del proveedor, ejecuta `db/migrations/001_accounts.sql`. Crea únicamente tablas con el prefijo `matchday_`, puede ejecutarse de nuevo y no borra datos. Las migraciones antiguas de `supabase/` no corresponden a este modo.
 
 Alternativa desde tu ordenador: instala las dependencias, guarda `DATABASE_URL` en `.env.local` y ejecuta `npm run db:migrate`. Ese comando carga el archivo privado y no imprime la conexión. La compilación no ejecuta migraciones ni necesita conectarse a la base.
@@ -62,6 +64,8 @@ Las contraseñas se guardan como hashes scrypt con sal aleatoria (N=131072, r=8,
 Las claves de OpenAI se cifran con AES-256-GCM y se vinculan al propietario. El navegador recibe únicamente estado y terminación. El administrador que controla el backend y el secreto puede descifrarlas: no es cifrado de extremo a extremo. No hay verificación ni recuperación por correo, ni migración automática de contraseñas de Supabase en esta versión. Las cuentas de esta base se registran de nuevo.
 
 La selección admite más de cuatro partidos, cada uno con su fecha. Cada petición vuelve a consultar el encuentro en la fuente de fútbol. Una generación correcta sale de la lista; las pendientes y fallidas permanecen. Puedes detener el lote tras la imagen en curso. Debes mantener la pestaña abierta: no es una cola que siga tras cerrar el navegador. La selección se conserva mientras usas el estudio y se vacía al recargar o cambiar de cuenta.
+
+En **Tu lista → Editar**, cada partido tiene su propio prompt, título y referencias. Los campos sin personalizar heredan los ajustes generales actuales; un título personalizado vacío omite el titular automático. Puedes excluir las referencias generales. El límite de cuatro archivos y 4 MB se aplica al conjunto efectivo de cada partido. La cola valida todos los diseños antes de hacer peticiones y envía los archivos de cada encuentro por separado. Los archivos de referencia y los borradores se mantienen solo en memoria; la galería guarda el prompt y los ajustes finales de las imágenes generadas.
 
 El límite diario es independiente de la cantidad seleccionable. Las referencias siguen limitadas a cuatro archivos y 4 MB en total para dejar margen al formulario dentro del límite de solicitud de Vercel. El adaptador OpenAI espera hasta 240 segundos y la ruta permite 300. Las pruebas no hacen llamadas facturables; acceso al modelo, saldo y permisos requieren una generación con tu cuenta.
 

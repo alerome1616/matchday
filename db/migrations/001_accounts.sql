@@ -37,4 +37,21 @@ CREATE TABLE IF NOT EXISTS matchday_images (
   prompt text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS matchday_images_owner_date ON matchday_images(user_id,created_at DESC);
+-- Keep account tables private even on hosts that grant public-schema access
+-- to API roles by default (such as Supabase). Only the backend DB owner reads them.
+DO $$
+DECLARE
+  table_name text;
+  api_role text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['matchday_users','matchday_sessions','matchday_auth_limits','matchday_credentials','matchday_settings','matchday_generation_requests','matchday_images'] LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', table_name);
+    EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC', table_name);
+    FOREACH api_role IN ARRAY ARRAY['anon','authenticated'] LOOP
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
+        EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', table_name, api_role);
+      END IF;
+    END LOOP;
+  END LOOP;
+END $$;
 COMMIT;

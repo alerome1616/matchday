@@ -3,7 +3,9 @@ import { resolveFootballSource } from "./football-config";
 import type { RuntimeConfig } from "./types";
 export function getConfig(): RuntimeConfig {
   const authProvider =
-    process.env.AUTH_PROVIDER === "postgres" || process.env.DATABASE_URL
+    process.env.AUTH_PROVIDER === "postgres" ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL
       ? "postgres"
       : process.env.NEXT_PUBLIC_DEMO_MODE === "false"
         ? "supabase"
@@ -14,7 +16,7 @@ export function getConfig(): RuntimeConfig {
   const imageMock = demo || process.env.IMAGE_PROVIDER !== "openai";
   const configured =
     authProvider === "postgres"
-      ? Boolean(process.env.DATABASE_URL)
+      ? Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL)
       : Boolean(
           process.env.NEXT_PUBLIC_SUPABASE_URL &&
           process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,

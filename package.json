@@ -14,7 +14,7 @@
     "dev:sites": "node scripts/run-framework.mjs dev",
     "build:sites": "node scripts/run-framework.mjs build",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/core.test.ts tests/selection.test.ts",
+    "test": "tsx --test tests/core.test.ts tests/selection.test.ts tests/match-designs.test.ts",
     "test:postgres": "node --conditions=react-server --import tsx --test tests/postgres-accounts.test.ts",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate-db.mjs",
     "test:accounts": "node --conditions=react-server --import tsx --test tests/account-key.test.ts",

@@ -1,5 +1,5 @@
 "use client";
-import { X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import type { StudioState } from "@/hooks/use-studio";
 export function SelectionList({ app }: { app: StudioState }) {
   return (
@@ -32,8 +32,21 @@ export function SelectionList({ app }: { app: StudioState }) {
                   month: "short",
                   timeZone: "Europe/Madrid",
                 })}
+                {" · "}
+                {app.matchDrafts[key] ? "Personalizado" : "Ajustes generales"}
               </small>
             </span>
+            <button
+              className="text-button edit-match"
+              disabled={app.generating}
+              onClick={() => {
+                app.setError("");
+                app.setEditingMatchKey(key);
+              }}
+              aria-label={`Editar diseño de ${fixture.home.name} contra ${fixture.away.name} del ${date}`}
+            >
+              <Pencil size={14} /> Editar
+            </button>
             <button
               className="icon-button"
               disabled={app.generating}

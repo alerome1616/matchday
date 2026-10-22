@@ -3,7 +3,21 @@ import { useId } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { referenceRoles } from "@/lib/creative";
 import type { StudioState } from "@/hooks/use-studio";
-export function ReferenceUploader({ app }: { app: StudioState }) {
+type ReferenceControls = Pick<
+  StudioState,
+  | "references"
+  | "generating"
+  | "addReferences"
+  | "updateReference"
+  | "removeReference"
+>;
+export function ReferenceUploader({
+  app,
+  inheritedCount = 0,
+}: {
+  app: ReferenceControls;
+  inheritedCount?: number;
+}) {
   const prefix = useId();
   return (
     <section className="reference-section">
@@ -11,7 +25,7 @@ export function ReferenceUploader({ app }: { app: StudioState }) {
         <label htmlFor={prefix + "reference-files"}>
           Imágenes de referencia
         </label>
-        <span>{app.references.length}/4</span>
+        <span>{app.references.length + inheritedCount}/4</span>
       </div>
       <label
         className={"reference-drop " + (app.generating ? "disabled" : "")}
@@ -31,7 +45,9 @@ export function ReferenceUploader({ app }: { app: StudioState }) {
           type="file"
           accept="image/png,image/jpeg,image/webp"
           multiple
-          disabled={app.generating || app.references.length >= 4}
+          disabled={
+            app.generating || app.references.length + inheritedCount >= 4
+          }
           onChange={(e) => {
             app.addReferences(Array.from(e.target.files ?? []));
             e.target.value = "";
