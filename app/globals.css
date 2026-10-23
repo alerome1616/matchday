@@ -3499,3 +3499,37 @@ input::placeholder {
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* The same creation mode controls are available in the desktop panel and mobile drawer. */
+.generation-mode-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin: 18px 0 12px;
+  background: #edf3f0;
+  border-radius: 12px;
+}
+.generation-mode-switch button {
+  flex: 1;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #285340;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.generation-mode-switch button[aria-pressed="true"] {
+  background: #174f3b;
+  color: white;
+}
+.generation-mode-switch button:focus-visible {
+  outline: 2px solid #174f3b;
+  outline-offset: 3px;
+}
+.free-design-entry {
+  margin-bottom: 20px;
+}

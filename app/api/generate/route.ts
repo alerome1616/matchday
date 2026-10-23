@@ -1,3 +1,4 @@
+import { resolveGenerationSubject } from "@/lib/generation-subject";
 import { NextResponse } from "next/server";
 import { getConfig, bucket } from "@/lib/config";
 import { footballProvider } from "@/lib/adapters/football";
@@ -5,7 +6,7 @@ import { OpenAIImageProvider } from "@/lib/adapters/images";
 import { readUserApiKey } from "@/lib/user-api-key";
 import { requireUser } from "@/lib/supabase/server";
 import { readGenerationRequest } from "@/lib/generation-request";
-import { buildPrompt } from "@/lib/prompt";
+import { buildDesignPrompt } from "@/lib/prompt";
 import { AppError, errorResponse, protectMutation } from "@/lib/errors";
 import { generateOwn } from "@/lib/own-generation";
 export const dynamic = "force-dynamic";
@@ -22,8 +23,6 @@ export async function POST(req: Request) {
     const { input, files, apiKey } = await readGenerationRequest(req);
     if (apiKey && apiKey.length < 20)
       throw new AppError("La clave temporal no es válida.");
-    if (input.fixtureIds.length !== 1)
-      throw new AppError("Genera un partido por solicitud.");
     const { db, user } = await requireUser();
     const generationKey =
       apiKey || (await readUserApiKey(user.id)) || process.env.OPENAI_API_KEY;
@@ -32,11 +31,9 @@ export async function POST(req: Request) {
         "Guarda tu clave de OpenAI en tu cuenta para generar imágenes.",
         400,
       );
-    const fixtures = await footballProvider(config.footballProvider).fixtures(
-      input.date,
+    const fixture = await resolveGenerationSubject(input, (date) =>
+      footballProvider(config.footballProvider).fixtures(date),
     );
-    const fixture = fixtures.find((f) => f.id === input.fixtureIds[0]);
-    if (!fixture) throw new AppError("El partido ya no está disponible.", 404);
     const { data: existing } = await db
       .from("generated_images")
       .select("id")
@@ -58,7 +55,11 @@ export async function POST(req: Request) {
         429,
       );
     try {
-      const prompt = buildPrompt(fixture, input.settings, input.references);
+      const prompt = buildDesignPrompt(
+        fixture,
+        input.settings,
+        input.references,
+      );
       const result = await new OpenAIImageProvider(generationKey).generate(
         fixture,
         input.settings,

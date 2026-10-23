@@ -20,14 +20,25 @@ export const settingsSchema = z.object({
   scene: z.enum(["stadium", "interior", "editorial", "custom"]).optional(),
   headline: z.string().max(160).optional(),
 });
-export const generationSchema = z.object({
-  fixtureIds: z
-    .array(z.number().int().positive())
-    .min(1)
-    .max(1)
-    .refine((a) => new Set(a).size === a.length, "No repitas partidos."),
-  date: dateSchema,
+const generationFields = {
   settings: settingsSchema,
   requestId: z.string().uuid(),
   references: z.array(referenceInstructionSchema).max(4).default([]),
-});
+};
+export const generationSchema = z.union([
+  z.object({
+    ...generationFields,
+    mode: z.literal("match").default("match"),
+    fixtureIds: z.array(z.number().int().positive()).length(1),
+    date: dateSchema,
+  }),
+  z.object({
+    ...generationFields,
+    mode: z.literal("free"),
+    fixtureIds: z.array(z.number()).length(0).default([]),
+    date: dateSchema.optional(),
+    settings: settingsSchema.extend({
+      headline: z.string().trim().min(1).max(160),
+    }),
+  }),
+]);

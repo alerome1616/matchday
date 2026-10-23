@@ -63,3 +63,48 @@ test("unreadable metadata does not crash the gallery or hide the other saved ima
   assert.ok(html.includes(saved.url));
   assert.equal(JSON.stringify(broken), before);
 });
+
+import { SettingsPanel } from "../components/settings-panel";
+test("free designs render with their real title beside saved match designs", () => {
+  const free = {
+    ...saved,
+    id: "free-image",
+    fixture: { kind: "free" },
+    settings: { ...defaultSettings, headline: "CIUDAD ENTRE NUBES" },
+  };
+  const html = render([free, saved]);
+  assert.ok(html.includes("CIUDAD ENTRE NUBES"));
+  assert.ok(html.includes("Creación libre"));
+  assert.ok(html.includes(fixture.home.name));
+  assert.ok(!html.includes('role="alert"'));
+  const restored = galleryRecord({
+    ...free,
+    fixture: JSON.stringify(free.fixture),
+  });
+  assert.deepEqual(restored?.fixture, { kind: "free" });
+});
+test("free editor enables generation without selected matches and provides title, prompt and references", () => {
+  const app = {
+    generationMode: "free",
+    config: { demo: true },
+    settings: {
+      ...defaultSettings,
+      prompt: "Una ciudad entre las nubes con luz cálida",
+      headline: "CIUDAD ENTRE NUBES",
+    },
+    selected: [],
+    selectedMatches: [],
+    references: [],
+    canGenerate: true,
+    hasGenerationTarget: true,
+    generating: false,
+    apiKey: "",
+    progress: { done: 0, total: 0 },
+  } as unknown as StudioState;
+  const html = renderToString(<SettingsPanel app={app} />);
+  assert.ok(html.includes("Título de la creación"));
+  assert.ok(html.includes("Imágenes de referencia"));
+  assert.ok(html.includes("Generar creación libre"));
+  assert.ok(!html.includes('class="primary generate" disabled'));
+  assert.ok(!html.includes("partidos seleccionados"));
+});

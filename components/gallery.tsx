@@ -11,7 +11,11 @@ import {
 import type { StudioState } from "@/hooks/use-studio";
 import type { GalleryImage } from "@/lib/types";
 import { styles, formats } from "@/lib/defaults";
-import { galleryRecords } from "@/lib/gallery-records";
+import {
+  galleryRecords,
+  galleryTitle,
+  galleryCompetition,
+} from "@/lib/gallery-records";
 import { Modal } from "./modal";
 export function Gallery({ app }: { app: StudioState }) {
   const [detail, setDetail] = useState<GalleryImage | null>(null);
@@ -20,7 +24,13 @@ export function Gallery({ app }: { app: StudioState }) {
   const [search, setSearch] = useState("");
   const records = galleryRecords(app.images);
   const visible = records.images.filter((i) =>
-    (i.fixture.home.name + " " + i.fixture.away.name + " " + i.fixture.league)
+    (
+      galleryTitle(i) +
+      " " +
+      galleryCompetition(i) +
+      " " +
+      (i.settings.headline ?? "")
+    )
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
@@ -36,7 +46,7 @@ export function Gallery({ app }: { app: StudioState }) {
               {app.hasMore ? "+" : ""}
             </span>
           </h1>
-          <p>Cada partido, una historia que merece guardarse.</p>
+          <p>Tus partidos y tus ideas, en un mismo lugar.</p>
         </div>
         <button className="primary" onClick={() => app.setView("matches")}>
           <ImagePlus size={17} />
@@ -49,7 +59,7 @@ export function Gallery({ app }: { app: StudioState }) {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por equipo o competición…"
+            placeholder="Buscar por título, equipo o competición…"
             aria-label="Buscar diseños"
           />
         </label>
@@ -88,21 +98,11 @@ export function Gallery({ app }: { app: StudioState }) {
                   setDetail(i);
                   setConfirm(false);
                 }}
-                aria-label={
-                  "Ver diseño de " +
-                  i.fixture.home.name +
-                  " contra " +
-                  i.fixture.away.name
-                }
+                aria-label={"Ver diseño de " + galleryTitle(i)}
               >
                 <img
                   src={i.url}
-                  alt={
-                    "Cartel de " +
-                    i.fixture.home.name +
-                    " vs " +
-                    i.fixture.away.name
-                  }
+                  alt={"Diseño de " + galleryTitle(i)}
                   loading="lazy"
                 />
                 <span className="poster-type">
@@ -111,23 +111,17 @@ export function Gallery({ app }: { app: StudioState }) {
                 </span>
               </button>
               <div className="gallery-card-info">
-                <h3>
-                  {i.fixture.home.short} <span>vs</span> {i.fixture.away.short}
-                </h3>
+                <h3>{galleryTitle(i)}</h3>
                 <button
                   className="icon-button"
                   title="Descargar diseño"
-                  aria-label={
-                    "Descargar " +
-                    i.fixture.home.name +
-                    " vs " +
-                    i.fixture.away.name
-                  }
+                  aria-label={"Descargar " + galleryTitle(i)}
                   onClick={() => app.download(i)}
                 >
                   <ArrowDownToLine size={17} />
                 </button>
                 <p>
+                  {galleryCompetition(i)} ·{" "}
                   {styles.find((s) => s.id === i.settings.style)?.name}{" "}
                   <span>
                     · {new Date(i.created_at).toLocaleDateString("es-ES")}
@@ -145,18 +139,18 @@ export function Gallery({ app }: { app: StudioState }) {
           <h2>
             {search
               ? "Ningún diseño coincide"
-              : "Tu galería empieza con un partido"}
+              : "Tu galería empieza con una idea"}
           </h2>
           <p>
             {search
-              ? "Prueba con otro equipo o competición."
-              : "Selecciona un encuentro, encuentra tu estilo y crea tu primer diseño."}
+              ? "Prueba con otro título, equipo o competición."
+              : "Elige partidos o crea una imagen libre con tu título y tu prompt."}
           </p>
           <button
             className="primary"
             onClick={() => (search ? setSearch("") : app.setView("matches"))}
           >
-            {search ? "Limpiar búsqueda" : "Elegir partidos"}
+            {search ? "Limpiar búsqueda" : "Crear un diseño"}
             <ArrowRight size={17} />
           </button>
         </div>
@@ -181,25 +175,13 @@ export function Gallery({ app }: { app: StudioState }) {
       >
         {detail && (
           <div className="detail-layout">
-            <img
-              src={detail.url}
-              alt={
-                "Diseño de " +
-                detail.fixture.home.name +
-                " y " +
-                detail.fixture.away.name
-              }
-            />
+            <img src={detail.url} alt={"Diseño de " + galleryTitle(detail)} />
             <div>
               <span className="eyebrow">
                 {detail.demo ? "DISEÑO DE DEMOSTRACIÓN" : "DISEÑO GENERADO"}
               </span>
-              <h3>
-                {detail.fixture.home.name}
-                <br />
-                <span className="muted">vs</span> {detail.fixture.away.name}
-              </h3>
-              <p className="muted">{detail.fixture.league}</p>
+              <h3>{galleryTitle(detail)}</h3>
+              <p className="muted">{galleryCompetition(detail)}</p>
               <dl>
                 <dt>Estilo</dt>
                 <dd>

@@ -137,3 +137,11 @@ El build principal compila Next.js y Sites/Vinext. Para un servidor Next.js o Ve
 Las pruebas de generación y subida usan respuestas de OpenAI simuladas, nunca una clave real ni solicitudes facturables. Es necesario verificar una generación real con tu cuenta para confirmar acceso al modelo, saldo y límites. La generación con clave temporal y la de servidor usan el mismo adaptador de OpenAI.
 
 Fuentes: [OpenAI Images](https://developers.openai.com/api/docs/guides/image-generation), [OpenAI Images edits](https://developers.openai.com/api/reference/resources/images/methods/edit), [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client?framework=nextjs), [ESPN](https://www.espn.com/soccer/scoreboard).
+
+### Orden de ligas y creación libre
+
+Las competiciones mantienen el nombre del proveedor. Champions League y Europa League aparecen primero; después LaLiga, Premier League, Serie A italiana, Ligue 1, Bundesliga, Eredivisie y la liga portuguesa. Los demás torneos aparecen después.
+
+Pulsa **Crear sin seleccionar partidos** o elige **Creación libre** en el generador. Introduce un título y un prompt de 20 a 4.000 caracteres, configura formato y calidad y, si quieres, adjunta hasta cuatro referencias (4 MB en total). Este modo usa un borrador separado de los ajustes por partido y conserva la selección de varios días. El título se incluye en la imagen. La generación utiliza la misma clave de OpenAI y se guarda en la misma galería privada (o en el navegador si se usa el modo local).
+
+La solicitud libre envía `mode: "free"` y `fixtureIds: []` a las rutas de generación; no consulta al proveedor de fútbol ni inventa un encuentro. El contexto se guarda como `{ "kind": "free" }` en el campo JSONB existente, sin migración ni cambios a imágenes anteriores. El límite diario y la reserva de solicitudes también se aplican a las creaciones libres. Los borradores de creación libre se mantienen mientras la app está abierta; las imágenes terminadas sí son persistentes.

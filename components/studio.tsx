@@ -32,6 +32,7 @@ import { useStudio, type View } from "@/hooks/use-studio";
 import { displayDate, madridDate } from "@/lib/date";
 import { defaultSettings, styles } from "@/lib/defaults";
 import { mockFixtures } from "@/lib/mock";
+import { orderFixtures } from "@/lib/league-order";
 import { posterDataUrl } from "@/lib/poster";
 import { FixtureCard } from "./fixture-card";
 import { SettingsPanel } from "./settings-panel";
@@ -69,14 +70,15 @@ export function Studio({ config }: { config: RuntimeConfig }) {
         "El enlace de confirmación no es válido o ha caducado. Vuelve a iniciar sesión.",
       );
   }, []);
-  const filtered = app.fixtures.filter(
+  const orderedFixtures = orderFixtures(app.fixtures);
+  const filtered = orderedFixtures.filter(
     (f) =>
       (league === "Todas" || f.league === league) &&
       (f.home.name + " " + f.away.name)
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
-  const leagues = [...new Set(app.fixtures.map((f) => f.league))];
+  const leagues = [...new Set(orderedFixtures.map((f) => f.league))];
 
   function navigate(view: View) {
     app.setView(view);
@@ -305,6 +307,16 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                   </div>
                 </div>
               </section>
+              <button
+                className="secondary free-design-entry"
+                disabled={app.generating}
+                onClick={() => {
+                  app.setGenerationMode("free");
+                  setGeneratorOpen(true);
+                }}
+              >
+                <Sparkles size={17} /> Crear sin seleccionar partidos
+              </button>
               <div className="studio-grid">
                 <section className="matches-section">
                   <div className="section-heading">
@@ -390,7 +402,7 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                         ) : (
                           <Trophy size={13} />
                         )}{" "}
-                        {l === "UEFA Champions League" ? "Champions League" : l}
+                        {l}
                       </button>
                     ))}
                   </div>
@@ -628,11 +640,17 @@ export function Studio({ config }: { config: RuntimeConfig }) {
         <>
           <div className="mobile-generator-bar">
             <div>
-              <strong>{app.selected.length} partidos</strong>
+              <strong>
+                {app.generationMode === "free"
+                  ? "Creación libre"
+                  : app.selected.length + " partidos"}
+              </strong>
               <small>
                 {app.generating
                   ? `Generando ${app.progress.done}/${app.progress.total}`
-                  : "Tu selección de varios días"}
+                  : app.generationMode === "free"
+                    ? "A partir de tu título y prompt"
+                    : "Tu selección de varios días"}
               </small>
             </div>
             <button className="primary" onClick={() => setGeneratorOpen(true)}>
@@ -649,14 +667,16 @@ export function Studio({ config }: { config: RuntimeConfig }) {
               <button
                 className="primary"
                 disabled={
-                  !app.selected.length || !app.canGenerate || app.generating
+                  !app.hasGenerationTarget || !app.canGenerate || app.generating
                 }
                 onClick={app.generate}
               >
                 <Sparkles size={17} />
                 {app.generating
                   ? `Generando ${app.progress.done}/${app.progress.total}…`
-                  : `Generar ${app.selected.length} imágenes`}
+                  : app.generationMode === "free"
+                    ? "Generar creación libre"
+                    : `Generar ${app.selected.length} imágenes`}
               </button>
               {app.generating ? (
                 <button className="text-button" onClick={app.stopGeneration}>
@@ -665,7 +685,9 @@ export function Studio({ config }: { config: RuntimeConfig }) {
               ) : (
                 <p>
                   {app.canGenerate
-                    ? "Una imagen por partido · consumo de tu API"
+                    ? app.generationMode === "free"
+                      ? "Una imagen a partir de tu idea · consumo de tu API"
+                      : "Una imagen por partido · consumo de tu API"
                     : "Conecta tu clave de OpenAI para generar."}
                 </p>
               )}
