@@ -402,7 +402,7 @@ export function Studio({ config }: { config: RuntimeConfig }) {
                         ) : (
                           <Trophy size={13} />
                         )}{" "}
-                        {l}
+                        {l === "UEFA Champions League" ? "Champions League" : l}
                       </button>
                     ))}
                   </div>
