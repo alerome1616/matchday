@@ -178,3 +178,112 @@ test("session route requires caller key and sends multipart references to OpenAI
     else process.env.FOOTBALL_PROVIDER = oldProvider;
   }
 });
+
+// Free designs use the same validated file and OpenAI pipeline without fetching fixtures.
+import { generationSchema } from "../lib/validation";
+import { freeGenerationForm } from "../lib/generation-design";
+import { resolveGenerationSubject } from "../lib/generation-subject";
+import { buildFreePrompt } from "../lib/prompt";
+const freeSettings = {
+  ...defaultSettings,
+  scene: "custom" as const,
+  headline: "CIUDAD FLOTANTE",
+  prompt:
+    "Una ciudad flotante entre nubes con luz de atardecer y arquitectura detallada.",
+};
+test("free payload requires an explicit mode, title and prompt; legacy match payloads remain valid", async () => {
+  const valid = {
+    mode: "free",
+    fixtureIds: [],
+    settings: freeSettings,
+    requestId: crypto.randomUUID(),
+  };
+  const parsed = generationSchema.parse(valid);
+  let footballCalls = 0;
+  const subject = await resolveGenerationSubject(parsed, async () => {
+    footballCalls++;
+    throw Error("Football unavailable");
+  });
+  assert.deepEqual(subject, { kind: "free" });
+  assert.equal(footballCalls, 0);
+  for (const invalid of [
+    { ...valid, mode: undefined },
+    { ...valid, settings: { ...freeSettings, headline: "  " } },
+    { ...valid, settings: { ...freeSettings, prompt: "short" } },
+    { ...valid, fixtureIds: [123] },
+  ])
+    assert.equal(generationSchema.safeParse(invalid).success, false);
+  assert.equal(generationSchema.parse(input()).mode, "match");
+  const prompt = buildFreePrompt(freeSettings, [
+    { role: "home-kit", notes: "Usa esta nave como objeto principal" },
+  ]);
+  assert.ok(prompt.includes(freeSettings.prompt));
+  assert.ok(prompt.includes(freeSettings.headline));
+  assert.ok(prompt.includes("Usa esta nave"));
+  assert.ok(
+    !/encuentro|equipo|estadio|Europe\/Madrid|EQUIPO_LOCAL/i.test(prompt),
+  );
+});
+test("free generation sends title, prompt and exact optional reference bytes to OpenAI; no football or database requests", async () => {
+  const originalFetch = globalThis.fetch;
+  const previousProvider = process.env.FOOTBALL_PROVIDER;
+  process.env.FOOTBALL_PROVIDER = "espn";
+  try {
+    for (const withReference of [false, true]) {
+      let calls = 0;
+      globalThis.fetch = async (url, init) => {
+        calls++;
+        assert.equal(
+          String(url),
+          "https://api.openai.com/v1/images/" +
+            (withReference ? "edits" : "generations"),
+        );
+        if (withReference) {
+          assert.ok(init?.body instanceof FormData);
+          const file = init.body.getAll("image[]")[0] as File;
+          assert.deepEqual(Buffer.from(await file.arrayBuffer()), pngBytes);
+          assert.ok(
+            String(init.body.get("prompt")).includes(freeSettings.headline),
+          );
+        } else {
+          const payload = JSON.parse(String(init?.body));
+          assert.ok(payload.prompt.includes(freeSettings.prompt));
+          assert.ok(payload.prompt.includes(freeSettings.headline));
+        }
+        return Response.json({
+          data: [{ b64_json: pngBytes.toString("base64") }],
+        });
+      };
+      const form = freeGenerationForm(
+        freeSettings,
+        withReference
+          ? [
+              {
+                id: "ref",
+                file: png(),
+                preview: "blob:test",
+                role: "composition",
+                notes: "Mantén el encuadre",
+              },
+            ]
+          : [],
+        crypto.randomUUID(),
+        "test-key-not-a-real-secret",
+      );
+      const response = await sessionGeneration(
+        new Request("https://example.test/api/generate-session", {
+          method: "POST",
+          body: form,
+          headers: { Origin: "https://example.test" },
+        }),
+      );
+      assert.equal(response.status, 200);
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), pngBytes);
+      assert.equal(calls, 1);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousProvider === undefined) delete process.env.FOOTBALL_PROVIDER;
+    else process.env.FOOTBALL_PROVIDER = previousProvider;
+  }
+});

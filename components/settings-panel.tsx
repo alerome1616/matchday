@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { styles, formats, defaultSettings } from "@/lib/defaults";
 import { scenes } from "@/lib/creative";
-import { buildPrompt } from "@/lib/prompt";
+import { buildFreePrompt, buildPrompt } from "@/lib/prompt";
 import type { StudioState } from "@/hooks/use-studio";
 import { ReferenceUploader } from "./reference-uploader";
 import { Modal } from "./modal";
@@ -29,6 +29,7 @@ export function SettingsPanel({
   expanded?: boolean;
 }) {
   const { settings, updateSettings } = app;
+  const free = app.generationMode === "free";
   const [preview, setPreview] = useState(false);
   const prefix = useId();
   return (
@@ -45,35 +46,69 @@ export function SettingsPanel({
         <h2>Tu dirección creativa</h2>
         <span className="step">02</span>
       </div>
-      <p className="panel-intro">
-        Ajustes generales. En tu lista, pulsa Editar para personalizar cada
-        partido.
-      </p>
-      <SelectionList app={app} />
-      <label className="field-label" htmlFor={prefix + "scene"}>
-        Escena
-      </label>
-      <select
-        id={prefix + "scene"}
-        className="creative-select"
-        value={settings.scene ?? "stadium"}
-        disabled={app.generating}
-        onChange={(e) =>
-          updateSettings({ scene: e.target.value as typeof settings.scene })
-        }
+      <div
+        className="generation-mode-switch"
+        role="group"
+        aria-label="Tipo de creación"
       >
-        {scenes.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-      <p className="field-hint">
-        {
-          scenes.find((s) => s.id === (settings.scene ?? "stadium"))
-            ?.description
-        }
+        <button
+          disabled={app.generating}
+          aria-pressed={!free}
+          onClick={() => app.setGenerationMode("match")}
+        >
+          Por partido
+        </button>
+        <button
+          disabled={app.generating}
+          aria-pressed={free}
+          onClick={() => app.setGenerationMode("free")}
+        >
+          Creación libre
+        </button>
+      </div>
+      <p className="panel-intro">
+        {free
+          ? "Escribe un título y describe tu idea. Puedes añadir imágenes de referencia; no necesitas seleccionar partidos."
+          : "Ajustes generales. En tu lista, pulsa Editar para personalizar cada partido."}
       </p>
+      {!free && (
+        <>
+          <SelectionList app={app} />
+          {!app.selected.length && (
+            <button
+              className="text-button"
+              disabled={app.generating}
+              onClick={() => app.setGenerationMode("free")}
+            >
+              ¿Sin partido? Crea una imagen libre
+            </button>
+          )}
+          <label className="field-label" htmlFor={prefix + "scene"}>
+            Escena
+          </label>
+          <select
+            id={prefix + "scene"}
+            className="creative-select"
+            value={settings.scene ?? "stadium"}
+            disabled={app.generating}
+            onChange={(e) =>
+              updateSettings({ scene: e.target.value as typeof settings.scene })
+            }
+          >
+            {scenes.map((scene) => (
+              <option key={scene.id} value={scene.id}>
+                {scene.name}
+              </option>
+            ))}
+          </select>
+          <p className="field-hint">
+            {
+              scenes.find((scene) => scene.id === (settings.scene ?? "stadium"))
+                ?.description
+            }
+          </p>
+        </>
+      )}
       <label className="field-label" htmlFor={prefix + "style"}>
         Acabado visual
       </label>
@@ -122,19 +157,23 @@ export function SettingsPanel({
         })}
       </div>
       <label className="field-label" htmlFor={prefix + "headline"}>
-        Titular para la imagen
+        {free ? "Título de la creación" : "Titular para la imagen"}
       </label>
       <input
         className="creative-input"
         id={prefix + "headline"}
         value={settings.headline ?? ""}
-        placeholder="Ej.: ORGULLO EN JUEGO"
+        placeholder={
+          free ? "Ej.: UNA CIUDAD ENTRE LAS NUBES" : "Ej.: ORGULLO EN JUEGO"
+        }
         maxLength={160}
         disabled={app.generating}
         onChange={(e) => updateSettings({ headline: e.target.value })}
       />
       <p className="field-hint">
-        Déjalo vacío si tu prompt ya define el texto o no quieres titular.
+        {free
+          ? "El título se incluirá en la imagen y te ayudará a encontrarla en la galería."
+          : "Déjalo vacío si tu prompt ya define el texto o no quieres titular."}
       </p>
       <div className="prompt-heading">
         <label htmlFor={prefix + "prompt"}>Prompt maestro</label>
@@ -146,6 +185,11 @@ export function SettingsPanel({
       <textarea
         id={prefix + "prompt"}
         value={settings.prompt}
+        placeholder={
+          free
+            ? "Describe lo que quieres crear: sujetos, escenario, iluminación, composición y detalles. Mínimo 20 caracteres."
+            : undefined
+        }
         maxLength={4000}
         minLength={20}
         disabled={app.generating}
@@ -156,13 +200,17 @@ export function SettingsPanel({
         <button
           className="text-button"
           disabled={app.generating}
-          onClick={() => updateSettings({ ...defaultSettings })}
+          onClick={() =>
+            updateSettings(
+              free ? { prompt: "", headline: "" } : { ...defaultSettings },
+            )
+          }
         >
-          Usar prompt fotorealista
+          {free ? "Vaciar título y prompt" : "Usar prompt fotorealista"}
         </button>
         <button
           className="text-button"
-          disabled={!app.selected.length}
+          disabled={free ? !app.hasGenerationTarget : !app.selected.length}
           onClick={() => setPreview(true)}
         >
           <Eye size={12} />
@@ -279,33 +327,41 @@ export function SettingsPanel({
           <ArrowUpRight size={11} />
         </a>
       </details>
-      <button
-        className="save-settings"
-        onClick={app.saveSettings}
-        disabled={app.generating || app.saved}
-      >
-        {app.saved ? <Check size={15} /> : <Save size={15} />}{" "}
-        {app.saved ? "Configuración guardada" : "Guardar configuración"}
-      </button>
+      {!free && (
+        <button
+          className="save-settings"
+          onClick={app.saveSettings}
+          disabled={app.generating || app.saved}
+        >
+          {app.saved ? <Check size={15} /> : <Save size={15} />}{" "}
+          {app.saved ? "Configuración guardada" : "Guardar configuración"}
+        </button>
+      )}
       <div className="generate-area">
         <div>
           <span>
-            {app.selected.length}{" "}
-            {app.selected.length === 1
-              ? "partido seleccionado"
-              : "partidos seleccionados"}
+            {free
+              ? "1 creación libre"
+              : app.selected.length +
+                (app.selected.length === 1
+                  ? " partido seleccionado"
+                  : " partidos seleccionados")}
           </span>
           <small>{app.references.length} referencias</small>
         </div>
         <button
           className="primary generate"
           onClick={app.generate}
-          disabled={!app.selected.length || app.generating || !app.canGenerate}
+          disabled={
+            !app.hasGenerationTarget || app.generating || !app.canGenerate
+          }
         >
           <Sparkles size={17} />
           {app.generating
             ? "Generando " + app.progress.done + "/" + app.progress.total + "…"
-            : "Generar con OpenAI"}
+            : free
+              ? "Generar creación libre"
+              : "Generar con OpenAI"}
           {!app.generating && <ArrowUpRight size={18} />}
         </button>
         {app.generating && (
@@ -326,27 +382,43 @@ export function SettingsPanel({
         className="prompt-preview-modal"
       >
         <p className="muted">
-          Cada imagen usará el prompt, el título y las referencias de su
-          partido.
+          {free
+            ? "Esta imagen usará tu título, tu prompt y las referencias adjuntas."
+            : "Cada imagen usará el prompt, el título y las referencias de su partido."}
         </p>
-        {app.selectedMatches.map(({ fixture: f, key, date }) => {
-          const design = app.getMatchDesign(key);
-          return (
-            <div className="prompt-final" key={key}>
-              <h3>
-                {f.home.name} × {f.away.name} · {date}
-              </h3>
-              <p>{design.references.length} referencias</p>
-              <pre>
-                {buildPrompt(
-                  f,
-                  design.settings,
-                  design.references.map(({ role, notes }) => ({ role, notes })),
-                )}
-              </pre>
-            </div>
-          );
-        })}
+        {free && (
+          <div className="prompt-final">
+            <h3>{settings.headline}</h3>
+            <pre>
+              {buildFreePrompt(
+                settings,
+                app.references.map(({ role, notes }) => ({ role, notes })),
+              )}
+            </pre>
+          </div>
+        )}
+        {!free &&
+          app.selectedMatches.map(({ fixture: f, key, date }) => {
+            const design = app.getMatchDesign(key);
+            return (
+              <div className="prompt-final" key={key}>
+                <h3>
+                  {f.home.name} × {f.away.name} · {date}
+                </h3>
+                <p>{design.references.length} referencias</p>
+                <pre>
+                  {buildPrompt(
+                    f,
+                    design.settings,
+                    design.references.map(({ role, notes }) => ({
+                      role,
+                      notes,
+                    })),
+                  )}
+                </pre>
+              </div>
+            );
+          })}
       </Modal>
     </section>
   );

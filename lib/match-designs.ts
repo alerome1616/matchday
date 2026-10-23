@@ -34,7 +34,7 @@ export function resolveMatchDesign(
 
 export function referenceFilesError(files: File[]): string | null {
   if (files.length > MAX_REFERENCE_FILES)
-    return "Puedes adjuntar hasta 4 imágenes por partido, incluidas las generales.";
+    return "Puedes adjuntar hasta 4 imágenes por diseño, incluidas las generales.";
   if (
     files.some(
       (f) =>
@@ -45,13 +45,13 @@ export function referenceFilesError(files: File[]): string | null {
   )
     return "Usa PNG, JPG o WebP de hasta 4 MB por imagen.";
   if (files.reduce((total, f) => total + f.size, 0) > MAX_TOTAL_REFERENCE_BYTES)
-    return "El total de referencias de un partido no puede superar 4 MB.";
+    return "El total de referencias de un diseño no puede superar 4 MB.";
   return null;
 }
 
 export function matchGenerationForm(
   match: SelectedMatch,
-  design: ReturnType<typeof resolveMatchDesign>,
+  design: { settings: Settings; references: ReferenceImage[] },
   requestId: string,
   apiKey: string,
 ) {

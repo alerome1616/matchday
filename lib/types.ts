@@ -26,9 +26,14 @@ export type Settings = {
   scene?: "stadium" | "interior" | "editorial" | "custom";
   headline?: string;
 };
+export type FreeDesign = { kind: "free" };
+export type DesignSubject = Fixture | FreeDesign;
+export function isFreeDesign(subject: DesignSubject): subject is FreeDesign {
+  return "kind" in subject && subject.kind === "free";
+}
 export type GalleryImage = {
   id: string;
-  fixture: Fixture;
+  fixture: DesignSubject;
   settings: Settings;
   prompt: string;
   created_at: string;

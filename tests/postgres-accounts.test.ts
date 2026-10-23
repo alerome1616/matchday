@@ -133,6 +133,38 @@ test("PostgreSQL migration, registration, durable sessions, owner-isolated encry
       () => reserveOwnGeneration(a.user.id, request, db),
       /ya se procesó/,
     );
+    const freeRequest = crypto.randomUUID(),
+      freeImage = crypto.randomUUID();
+    await reserveOwnGeneration(a.user.id, freeRequest, db);
+    await db.query(
+      "INSERT INTO matchday_images (id,user_id,request_id,storage_path,fixture,settings,prompt) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)",
+      [
+        freeImage,
+        a.user.id,
+        freeRequest,
+        "https://private.example/free.png",
+        { kind: "free" },
+        { ...defaultSettings, headline: "CIUDAD FLOTANTE" },
+        "Una ciudad flotante entre nubes",
+      ],
+    );
+    await db.query(
+      "UPDATE matchday_generation_requests SET status='succeeded' WHERE id=$1",
+      [freeRequest],
+    );
+    const freeGallery = await listOwnImages(a.user.id, 0, db);
+    assert.equal(freeGallery.images.length, 2);
+    const freeDesign = freeGallery.images.find(
+      (image) => image.id === freeImage,
+    )!;
+    assert.deepEqual(freeDesign.fixture, { kind: "free" });
+    assert.equal(freeDesign.settings.headline, "CIUDAD FLOTANTE");
+    assert.equal(freeDesign.prompt, "Una ciudad flotante entre nubes");
+    assert.equal((await listOwnImages(b.user.id, 0, db)).images.length, 0);
+    await assert.rejects(
+      () => ownImage(b.user.id, freeImage, db),
+      /no encontrada/,
+    );
     const oldLimit = process.env.DAILY_GENERATION_LIMIT;
     process.env.DAILY_GENERATION_LIMIT = "1";
     try {

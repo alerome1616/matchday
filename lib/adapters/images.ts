@@ -1,6 +1,6 @@
 import "server-only";
 import { formats } from "../defaults";
-import type { Fixture, Settings } from "../types";
+import type { DesignSubject, Settings } from "../types";
 import { AppError } from "../errors";
 export type ImageResult = {
   bytes: Uint8Array;
@@ -10,7 +10,7 @@ export type ImageResult = {
 };
 export interface ImageProvider {
   generate(
-    fixture: Fixture,
+    fixture: DesignSubject,
     settings: Settings,
     prompt: string,
     references?: File[],
@@ -27,7 +27,7 @@ export class MockImageProvider implements ImageProvider {
 export class OpenAIImageProvider implements ImageProvider {
   constructor(private readonly sessionKey?: string) {}
   async generate(
-    _fixture: Fixture,
+    _fixture: DesignSubject,
     s: Settings,
     prompt: string,
     references: File[] = [],

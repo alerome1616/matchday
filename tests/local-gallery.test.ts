@@ -38,3 +38,23 @@ test("generated PNG is persisted independently of temporary API key and restored
   await deleteLocalImage(image.id);
   assert.deepEqual(await listLocalImages(), []);
 });
+
+test("free designs persist their context, title and prompt without inventing teams", async () => {
+  const image: GalleryImage = {
+    id: crypto.randomUUID(),
+    fixture: { kind: "free" },
+    settings: { ...defaultSettings, headline: "CIUDAD FLOTANTE" },
+    prompt: "Una ciudad flotante entre nubes",
+    created_at: new Date().toISOString(),
+    url: "blob:temporary",
+    demo: false,
+  };
+  await saveLocalImage(image, new Blob(["image bytes"], { type: "image/png" }));
+  const restored = await listLocalImages();
+  assert.equal(restored.length, 1);
+  assert.deepEqual(restored[0].fixture, { kind: "free" });
+  assert.equal(restored[0].settings.headline, image.settings.headline);
+  assert.equal(restored[0].prompt, image.prompt);
+  URL.revokeObjectURL(restored[0].url);
+  await deleteLocalImage(image.id);
+});

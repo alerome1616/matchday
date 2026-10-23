@@ -1,4 +1,9 @@
-import type { Fixture, GalleryImage, Settings } from "./types";
+import {
+  isFreeDesign,
+  type Fixture,
+  type GalleryImage,
+  type Settings,
+} from "./types";
 
 // Older Postgres.js writes serialized JSON twice. Decode it on read so that
 // existing files remain usable without regenerating or rewriting them.
@@ -25,37 +30,41 @@ export function galleryRecord(value: unknown): GalleryImage | null {
   if (!row || typeof row.id !== "string" || typeof row.url !== "string")
     return null;
   const fixture = record(row.fixture);
+  const free = fixture?.kind === "free";
   const home = record(fixture?.home),
     away = record(fixture?.away);
   if (
-    !fixture ||
-    !home ||
-    !away ||
-    typeof home.name !== "string" ||
-    typeof away.name !== "string"
+    !free &&
+    (!fixture ||
+      !home ||
+      !away ||
+      typeof home.name !== "string" ||
+      typeof away.name !== "string")
   )
     return null;
   return {
     id: row.id,
     url: row.url,
-    fixture: {
-      ...fixture,
-      league: typeof fixture.league === "string" ? fixture.league : "",
-      home: {
-        ...home,
-        short:
-          typeof home.short === "string"
-            ? home.short
-            : home.name.slice(0, 3).toUpperCase(),
-      },
-      away: {
-        ...away,
-        short:
-          typeof away.short === "string"
-            ? away.short
-            : away.name.slice(0, 3).toUpperCase(),
-      },
-    } as Fixture,
+    fixture: free
+      ? { kind: "free" }
+      : ({
+          ...fixture,
+          league: typeof fixture!.league === "string" ? fixture!.league : "",
+          home: {
+            ...home!,
+            short:
+              typeof home!.short === "string"
+                ? home!.short
+                : (home!.name as string).slice(0, 3).toUpperCase(),
+          },
+          away: {
+            ...away!,
+            short:
+              typeof away!.short === "string"
+                ? away!.short
+                : (away!.name as string).slice(0, 3).toUpperCase(),
+          },
+        } as Fixture),
     // Preserve historical values. The gallery labels an unknown format instead
     // of guessing the dimensions or dropping the saved image.
     settings: (record(row.settings) ?? {}) as Settings,
@@ -71,4 +80,13 @@ export function galleryRecords(values: unknown) {
     .map(galleryRecord)
     .filter((image): image is GalleryImage => image !== null);
   return { images, unreadable: rows.length - images.length };
+}
+
+export function galleryTitle(image: GalleryImage) {
+  return isFreeDesign(image.fixture)
+    ? image.settings.headline?.trim() || "Creación libre"
+    : image.fixture.home.name + " vs " + image.fixture.away.name;
+}
+export function galleryCompetition(image: GalleryImage) {
+  return isFreeDesign(image.fixture) ? "Creación libre" : image.fixture.league;
 }

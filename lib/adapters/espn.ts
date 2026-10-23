@@ -1,5 +1,6 @@
 import "server-only";
 import { AppError } from "../errors";
+import { orderFixtures } from "../league-order";
 import { madridDate } from "../date";
 import type { Fixture, Team } from "../types";
 import type { FootballProvider } from "./football";
@@ -105,26 +106,13 @@ export function normalizeEspnBoards(
       });
     }
   }
-  const priority = (league: string) => {
-    const names = [
-      "UEFA Champions League",
-      "UEFA Europa League",
-      "UEFA Conference League",
-      "Spanish LALIGA",
-      "English Premier League",
-      "Italian Serie A",
-      "German Bundesliga",
-      "French Ligue 1",
-    ];
-    const index = names.indexOf(league);
-    return index < 0 ? names.length : index;
-  };
-  return [...unique.values()].sort(
-    (a, b) =>
-      priority(a.league) - priority(b.league) ||
-      a.kickoff.localeCompare(b.kickoff) ||
-      a.league.localeCompare(b.league) ||
-      a.id - b.id,
+  return orderFixtures(
+    [...unique.values()].sort(
+      (a, b) =>
+        a.kickoff.localeCompare(b.kickoff) ||
+        a.league.localeCompare(b.league) ||
+        a.id - b.id,
+    ),
   );
 }
 export class EspnFootballProvider implements FootballProvider {

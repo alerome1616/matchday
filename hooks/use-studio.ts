@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  DesignSubject,
   Fixture,
   FixturesSource,
   GalleryImage,
@@ -13,7 +14,10 @@ import type {
 import { defaultSettings, upgradeCreativeSettings } from "@/lib/defaults";
 import { createClient } from "@/lib/supabase/client";
 import { madridDate } from "@/lib/date";
-import { buildPrompt } from "@/lib/prompt";
+import { buildDesignPrompt } from "@/lib/prompt";
+import { isFreeDesign } from "@/lib/types";
+import { galleryTitle } from "@/lib/gallery-records";
+import { freeGenerationForm } from "@/lib/generation-design";
 import {
   MAX_REFERENCE_FILES,
   MAX_REFERENCE_BYTES,
@@ -66,8 +70,9 @@ export function useStudio(config: RuntimeConfig) {
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [keyBusy, setKeyBusy] = useState(false);
   const [references, setReferences] = useState<ReferenceImage[]>([]);
+  const [freeReferences, setFreeReferences] = useState<ReferenceImage[]>([]);
   const referencesRef = useRef(references);
-  referencesRef.current = references;
+
   const imageUrlsRef = useRef<string[]>([]);
   useEffect(
     () => () => {
@@ -87,6 +92,20 @@ export function useStudio(config: RuntimeConfig) {
   const selected = selectedMatches.map((match) => match.key);
   const stopRequested = useRef(false);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [generationMode, setGenerationMode] = useState<"match" | "free">(
+    "match",
+  );
+  const [freeSettings, setFreeSettings] = useState<Settings>({
+    ...defaultSettings,
+    scene: "custom",
+    prompt: "",
+    headline: "",
+  });
+  referencesRef.current = [...references, ...freeReferences];
+  const activeReferences =
+    generationMode === "free" ? freeReferences : references;
+  const setActiveReferences =
+    generationMode === "free" ? setFreeReferences : setReferences;
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [user, setUser] = useState<StudioUser | null>(null);
   const authVersion = useRef(0);
@@ -117,8 +136,16 @@ export function useStudio(config: RuntimeConfig) {
         setSelectedMatches([]);
         clearMatchDrafts();
         setSettings(defaultSettings);
+        setFreeSettings({
+          ...defaultSettings,
+          scene: "custom",
+          prompt: "",
+          headline: "",
+        });
+        setGenerationMode("match");
         referencesRef.current.forEach((r) => URL.revokeObjectURL(r.preview));
         setReferences([]);
+        setFreeReferences([]);
       }
       userIdRef.current = account?.id ?? null;
       setUser(account);
@@ -405,6 +432,10 @@ export function useStudio(config: RuntimeConfig) {
     if (view === "gallery" && !config.demo && user) void loadGallery();
   }, [view, user, config.demo, loadGallery]);
   function updateSettings(value: Partial<Settings>) {
+    if (generationMode === "free") {
+      setFreeSettings((current) => ({ ...current, ...value }));
+      return;
+    }
     settingsDirty.current = true;
     setSettings((s) => ({ ...s, ...value }));
     setSaved(false);
@@ -432,13 +463,14 @@ export function useStudio(config: RuntimeConfig) {
   function toggle(id: number) {
     const fixture = fixtures.find((f) => f.id === id);
     if (fixture) {
+      setGenerationMode("match");
       if (selected.includes(selectionKey(date, id)))
         clearMatchDrafts([selectionKey(date, id)]);
       setSelectedMatches((current) => toggleMatch(current, fixture, date));
     }
   }
   function addReferences(files: File[]) {
-    if (references.length + files.length > MAX_REFERENCE_FILES) {
+    if (activeReferences.length + files.length > MAX_REFERENCE_FILES) {
       setError("Puedes adjuntar hasta 4 imágenes.");
       return;
     }
@@ -454,7 +486,7 @@ export function useStudio(config: RuntimeConfig) {
       return;
     }
     if (
-      [...references.map((r) => r.file), ...files].reduce(
+      [...activeReferences.map((r) => r.file), ...files].reduce(
         (sum, f) => sum + f.size,
         0,
       ) > MAX_TOTAL_REFERENCE_BYTES
@@ -462,7 +494,7 @@ export function useStudio(config: RuntimeConfig) {
       setError("El total de referencias no puede superar 4 MB.");
       return;
     }
-    setReferences((current) => [
+    setActiveReferences((current) => [
       ...current,
       ...files.map((file) => ({
         id: crypto.randomUUID(),
@@ -477,17 +509,18 @@ export function useStudio(config: RuntimeConfig) {
     id: string,
     value: Partial<Pick<ReferenceImage, "role" | "notes">>,
   ) {
-    setReferences((current) =>
+    setActiveReferences((current) =>
       current.map((r) => (r.id === id ? { ...r, ...value } : r)),
     );
   }
   function removeReference(id: string) {
-    const ref = references.find((r) => r.id === id);
+    const ref = activeReferences.find((r) => r.id === id);
     if (ref) URL.revokeObjectURL(ref.preview);
-    setReferences((current) => current.filter((r) => r.id !== id));
+    setActiveReferences((current) => current.filter((r) => r.id !== id));
   }
   async function generate() {
-    if (busy.current || !selected.length) return;
+    if (busy.current || (generationMode === "match" && !selected.length))
+      return;
     if (!apiKey.trim() && !keyStatus?.saved && !config.generationConfigured) {
       setError(
         "Conecta OpenAI con tu clave temporal para generar una imagen real.",
@@ -498,23 +531,44 @@ export function useStudio(config: RuntimeConfig) {
       setAuthOpen(true);
       return;
     }
-    const batch = selectedMatches.map((match) => {
-      const design = matchDesigns.getMatchDesign(match.key);
-      return {
-        ...structuredClone(match),
-        settings: { ...design.settings },
-        references: design.references.map((r) => ({ ...r })),
-      };
-    });
+    const batch: {
+      fixture: DesignSubject;
+      date: string;
+      key: string;
+      settings: Settings;
+      references: ReferenceImage[];
+    }[] =
+      generationMode === "free"
+        ? [
+            {
+              fixture: { kind: "free" },
+              date,
+              key: "free",
+              settings: { ...freeSettings },
+              references: freeReferences.map((r) => ({ ...r })),
+            },
+          ]
+        : selectedMatches.map((match) => {
+            const design = matchDesigns.getMatchDesign(match.key);
+            return {
+              ...structuredClone(match),
+              settings: { ...design.settings },
+              references: design.references.map((r) => ({ ...r })),
+            };
+          });
     for (const match of batch) {
-      const invalid = !settingsSchema.safeParse(match.settings).success
-        ? "Revisa el prompt (20–4.000 caracteres) y el título (máximo 160)."
-        : referenceFilesError(match.references.map((r) => r.file));
+      const invalid =
+        isFreeDesign(match.fixture) && !match.settings.headline?.trim()
+          ? "Añade un título para tu creación libre."
+          : !settingsSchema.safeParse(match.settings).success
+            ? "Revisa el prompt (20–4.000 caracteres) y el título (máximo 160)."
+            : referenceFilesError(match.references.map((r) => r.file));
       if (invalid) {
         setError(
-          `${match.fixture.home.name} × ${match.fixture.away.name} · ${match.date}: ${invalid}`,
+          `${isFreeDesign(match.fixture) ? "Creación libre" : match.fixture.home.name + " × " + match.fixture.away.name + " · " + match.date}: ${invalid}`,
         );
-        matchDesigns.setEditingMatchKey(match.key);
+        if (!isFreeDesign(match.fixture))
+          matchDesigns.setEditingMatchKey(match.key);
         return;
       }
     }
@@ -539,12 +593,19 @@ export function useStudio(config: RuntimeConfig) {
         }));
         try {
           const requestId = crypto.randomUUID();
-          const form = matchGenerationForm(
-            batch[i],
-            batch[i],
-            requestId,
-            temporaryKey,
-          );
+          const form = isFreeDesign(f)
+            ? freeGenerationForm(
+                snapshot,
+                batch[i].references,
+                requestId,
+                temporaryKey,
+              )
+            : matchGenerationForm(
+                { fixture: f, date: fixtureDate, key: selectedKey },
+                batch[i],
+                requestId,
+                temporaryKey,
+              );
           if (temporaryKey && config.demo) {
             const response = await fetch("/api/generate-session", {
               method: "POST",
@@ -564,7 +625,7 @@ export function useStudio(config: RuntimeConfig) {
               id: requestId,
               fixture: f,
               settings: snapshot,
-              prompt: buildPrompt(f, snapshot, instructions),
+              prompt: buildDesignPrompt(f, snapshot, instructions),
               created_at: new Date().toISOString(),
               url,
               demo: false,
@@ -600,17 +661,17 @@ export function useStudio(config: RuntimeConfig) {
           }
 
           success++;
-          clearMatchDrafts([selectedKey]);
-          setSelectedMatches((matches) =>
-            matches.filter((match) => match.key !== selectedKey),
-          );
+          if (!isFreeDesign(f)) {
+            clearMatchDrafts([selectedKey]);
+            setSelectedMatches((matches) =>
+              matches.filter((match) => match.key !== selectedKey),
+            );
+          }
         } catch (e) {
           failures.push(
-            fixtureDate +
-              " · " +
-              f.home.short +
-              "–" +
-              f.away.short +
+            (isFreeDesign(f)
+              ? "Creación libre"
+              : fixtureDate + " · " + f.home.short + "–" + f.away.short) +
               ": " +
               (e as Error).message,
           );
@@ -656,9 +717,11 @@ export function useStudio(config: RuntimeConfig) {
       a.href = url;
       a.download =
         "matchday-" +
-        image.fixture.home.short +
-        "-" +
-        image.fixture.away.short +
+        galleryTitle(image)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9_-]+/g, "-")
+          .slice(0, 100) +
         (image.demo ? ".svg" : ".png");
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 3000);
@@ -701,7 +764,7 @@ export function useStudio(config: RuntimeConfig) {
     keyBusy,
     saveApiKey,
     deleteApiKey,
-    references,
+    references: activeReferences,
     addReferences,
     updateReference,
     removeReference,
@@ -721,6 +784,7 @@ export function useStudio(config: RuntimeConfig) {
     selectedMatches,
     isSelected: (id: number) => selected.includes(selectionKey(date, id)),
     toggleVisible: (visible: Fixture[]) => {
+      setGenerationMode("match");
       const next = selectVisible(selectedMatches, visible, date);
       const retained = new Set(next.map((match) => match.key));
       clearMatchDrafts(
@@ -745,7 +809,14 @@ export function useStudio(config: RuntimeConfig) {
       setMessage("Se detendrá al terminar la imagen en curso.");
     },
     toggle,
-    settings,
+    generationMode,
+    setGenerationMode,
+    hasGenerationTarget:
+      generationMode === "free"
+        ? settingsSchema.safeParse(freeSettings).success &&
+          Boolean(freeSettings.headline?.trim())
+        : selected.length > 0,
+    settings: generationMode === "free" ? freeSettings : settings,
     updateSettings,
     saveSettings,
     saved,
